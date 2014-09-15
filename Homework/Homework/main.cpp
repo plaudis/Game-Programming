@@ -10,6 +10,11 @@ GLuint LoadTexture(const char *image_path) {
 	GLuint textureID;
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
+	/*float pixels[] = {
+		0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f
+	};
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);*/
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, surface->w, surface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE,surface->pixels);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -46,10 +51,15 @@ int main(int argc, char *argv[])
 	SDL_GL_MakeCurrent(displayWindow, context);
 
 	bool done = false;
-	
-	SDL_Event event;
 
-	GLint cat = LoadTexture("Cat.png");
+	float lastFrameTicks = 0.0f;
+	float animationAngle = 0.0f;
+
+	SDL_Event event;
+	glViewport(0, 0, 800, 600);
+	glMatrixMode(GL_PROJECTION);
+	glOrtho(-1.33, 1.33, -1.0, 1.0, -1.0, 1.0);
+	GLint cat = LoadTexture("Mario.jpg");
 
 	while (!done) {
 		while (SDL_PollEvent(&event)) {
@@ -58,7 +68,36 @@ int main(int argc, char *argv[])
 			}
 			
 		}
+		
+		float ticks = (float)SDL_GetTicks() / 1000.0f;
+		float elapsed = ticks - lastFrameTicks;
+		lastFrameTicks = ticks;
+		animationAngle+=elapsed;
+		
+
+		glClearColor(0.4f, 0.2f, 0.4f, 1.0f); 
+		glClear(GL_COLOR_BUFFER_BIT); 
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		glTranslatef(1.0, 1.0, 0.0);
+		glRotatef(animationAngle*30, 0.0, 0.0, 1.0);
+
+		GLfloat triangle[] = { 0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f };
+		glVertexPointer(2, GL_FLOAT, 0, triangle);
+		glEnableClientState(GL_VERTEX_ARRAY);
+
+		GLfloat triangleColors[] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
+		glColorPointer(3, GL_FLOAT, 0, triangleColors);
+		glEnableClientState(GL_COLOR_ARRAY);
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glDisableClientState(GL_COLOR_ARRAY);
+		glLoadIdentity();
 		DrawSprite(cat, 0.0, 0.0, 0.0);
+
+		
 		SDL_GL_SwapWindow(displayWindow);
 	}
 	SDL_Quit();
