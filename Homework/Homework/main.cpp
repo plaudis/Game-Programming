@@ -7,6 +7,9 @@ SDL_Window* displayWindow;
 
 GLuint LoadTexture(const char *image_path) {
 	SDL_Surface *surface = IMG_Load(image_path);
+	if (!surface){
+		return -1;
+	}
 	GLuint textureID;
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
@@ -59,8 +62,8 @@ int main(int argc, char *argv[])
 	glViewport(0, 0, 800, 600);
 	glMatrixMode(GL_PROJECTION);
 	glOrtho(-1.33, 1.33, -1.0, 1.0, -1.0, 1.0);
-	GLint cat = LoadTexture("Mario.jpg");
-
+	GLint medal = LoadTexture("medal.png");
+	GLint mario = LoadTexture("pieceBlack.png");
 	while (!done) {
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
@@ -95,7 +98,8 @@ int main(int argc, char *argv[])
 
 		glDisableClientState(GL_COLOR_ARRAY);
 		glLoadIdentity();
-		DrawSprite(cat, 0.0, 0.0, 0.0);
+		DrawSprite(medal, -0.5, 0.5, 0.0);
+		DrawSprite(mario, 0.5, 0.0, 0.0);
 
 		
 		SDL_GL_SwapWindow(displayWindow);
