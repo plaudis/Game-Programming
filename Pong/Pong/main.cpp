@@ -44,9 +44,9 @@ void Setup(){
 	rightWon = new Entity(rightWins, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 	leftWon = new Entity(leftWins, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 
-	ball->speed = 1.0;
-	ball->direction_y = 0.5;
-	ball->direction_x = 0.5;
+	ball->speed = 1.0f;
+	ball->direction_y = 0.75f;
+	ball->direction_x = 0.75f;
 
 	glMatrixMode(GL_PROJECTION);
 	glOrtho(-1.33, 1.33, -1.0, 1.0, -1.0, 1.0);
@@ -103,8 +103,8 @@ void Update(){
 	if (ball->y>0.95f&&ball->direction_y > 0.0f){ ball->direction_y = -ball->direction_y; }
 	else if (ball->y<-0.95f&&ball->direction_y < 0.0f){ ball->direction_y = -ball->direction_y; }
 
-	if (ball->x<-1.1f&&ball->x>-1.3&&ball->y>paddle2->y - 0.25f&&ball->y < paddle2->y + 0.25f){ ball->direction_x = abs(ball->direction_x); }
-	else if (ball->x>1.1f&&ball->x<1.3&&ball->y>paddle1->y - 0.25f&&ball->y < paddle1->y + 0.25f){ ball->direction_x = -abs(ball->direction_x); }
+	if (ball->x<-1.1f&&ball->x>-1.3&&ball->y>paddle2->y - 0.25f&&ball->y < paddle2->y + 0.25f){ ball->direction_x = 1.0; }
+	else if (ball->x>1.1f&&ball->x<1.3&&ball->y>paddle1->y - 0.25f&&ball->y < paddle1->y + 0.25f){ ball->direction_x = -1.0; }
 }
 
 void Render(){
