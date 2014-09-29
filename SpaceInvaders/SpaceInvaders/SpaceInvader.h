@@ -21,9 +21,11 @@ public:
 private:
 	int state;
 	int score;
-	int lives;
+	int damage;
+	bool alive;
 	bool done;
 	float lastFrameTicks;
+	float timePassed;
 	SDL_Window* displayWindow;
 
 	GLuint fontTexture;
@@ -35,6 +37,7 @@ private:
 
 	void UpdateBullets(float elapsed, std::vector<GameObject*>& bullets);
 	void UpdateEnemiesAndScore(float elapsed, std::vector<GameObject*>& enemies, std::vector<GameObject*>& bullets);
+	void UpdateDamage(float elapsed, std::vector<GameObject*>& bullets);
 
 	void UpdateMenu();
 	void UpdateGame();
