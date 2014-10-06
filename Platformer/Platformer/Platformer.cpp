@@ -116,6 +116,20 @@ void Platformer::ResetGame(){
 	lastFrameTicks = 0.0f;
 	timeLeftOver = 0.0f;
 	timePassed = 0.0f;
+	player->x=-1.0f;
+	player->y = -0.8f;
+	player->velocity_x = 0.0f;
+	player->velocity_y = 0.0f;
+	player->acceleration_x = 0.0f;
+	player->acceleration_y = 0.0f;
+	player->collidedBottom = false;
+	player->collidedTop = false;
+	player->collidedLeft = false;
+	player->collidedRight = false;
+
+	for (GLuint i = 0; i < enemies.size(); i++) { delete enemies[i]; }
+	enemies.clear();
+	
 }
 
 bool Platformer::UpdateAndRender()
@@ -144,6 +158,13 @@ float lerp(float v0, float v1, float t) {
 }
 
 void Platformer::FixedUpdate(){
+	if (player->x - player->width*0.2f < -1.3f){ player->x=-1.3f + player->width*0.2f; }
+	else if (player->x + player->width*0.2f > 1.2f && player->y>0.35f){ 
+		score = 1;
+	}
+
+
+
 	player->velocity_y = lerp(player->velocity_y, 0.0f, FIXED_TIMESTEP * player->friction_y);
 	player->velocity_y += player->acceleration_y * FIXED_TIMESTEP;
 	player->y += player->velocity_y * FIXED_TIMESTEP;
@@ -177,6 +198,10 @@ void Platformer::FixedUpdate(){
 				else if (enemies[j]->collidedRight){ enemies[j]->x = map[i]->x - map[i]->width*0.2f - enemies[j]->width*0.2f; enemies[j]->velocity_x = -0.5f; enemies[j]->collidedRight = false; }
 			}
 		}
+		if (enemies[j]->collidesWithX(player)){
+			ResetGame();
+			break;
+		}
 
 		enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
 		enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
@@ -189,12 +214,10 @@ void Platformer::FixedUpdate(){
 			}
 		}
 
-		if (enemies[j]->collidesWithX(player)){
-			//lose
-		}
-		else if (enemies[j]->collidesWithY(player)){
-			if (enemies[j]->collidedBottom){ }
-			else if (enemies[j]->collidedTop){ delete enemies[j]; enemies.erase(enemies.begin()+j); }
+		
+		if (enemies[j]->collidesWithY(player)){
+			ResetGame();
+			break;
 		}
 	}
 
@@ -206,7 +229,7 @@ void Platformer::Update(float elapsed)
 
 	if (timePassed > 2.0f){
 		timePassed = 0.0f;
-		enemies.push_back(new GameObject(spriteSheet, 1.3f, 0.8f, -0.5f, 0.0f, 0.0f, 196.0f / 256.0f, 94.0f / 256.0f, 50.0f / 256.0f, 28.0f / 256.0f, 1.0f, false, true));
+		enemies.push_back(new GameObject(spriteSheet, 1.0f, 0.8f, -0.5f, 0.0f, 0.0f, 196.0f / 256.0f, 94.0f / 256.0f, 50.0f / 256.0f, 28.0f / 256.0f, 1.0f, false, true));
 	}
 
 	if (keys[SDL_SCANCODE_LEFT]) {//move left
@@ -241,11 +264,13 @@ void Platformer::Render()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	
-	for (GLuint i = 0; i < map.size(); i++) { map[i]->DrawSprite(0.2f); }
-	for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(0.2f); }
+	glLoadIdentity();
+	if (score){ glTranslatef(-0.8f,0.0f,0.0f); PrintText(fontTexture, "YOU WIN!", 0.25f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f); }
+	else{
+		for (GLuint i = 0; i < map.size(); i++) { map[i]->DrawSprite(0.2f); }
+		for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(0.2f); }
 
-	player->DrawSprite(0.2f);
-
+		player->DrawSprite(0.2f);
+	}
 	SDL_GL_SwapWindow(displayWindow);
 }
