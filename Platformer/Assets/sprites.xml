@@ -1,0 +1,13 @@
+<TextureAtlas imagePath="sprites.png">
+	<SubTexture name="p1_duck.png" x="72" y="72" width="69" height="71"/>
+	<SubTexture name="p1_front.png" x="141" y="145" width="66" height="92"/>
+	<SubTexture name="p1_jump.png" x="72" y="145" width="67" height="94"/>
+	<SubTexture name="p1_stand.png" x="144" y="0" width="66" height="92"/>
+	<SubTexture name="slice_f.png" x="0" y="144" width="70" height="70"/>
+	<SubTexture name="slice_l.png" x="0" y="72" width="70" height="70"/>
+	<SubTexture name="slice_m.png" x="0" y="0" width="70" height="70"/>
+	<SubTexture name="slice_r.png" x="72" y="0" width="70" height="70"/>
+	<SubTexture name="slimeDead.png" x="0" y="216" width="59" height="12"/>
+	<SubTexture name="slimeWalk1.png" x="196" y="94" width="50" height="28"/>
+	<SubTexture name="slimeWalk2.png" x="143" y="94" width="51" height="26"/>
+</TextureAtlas>
