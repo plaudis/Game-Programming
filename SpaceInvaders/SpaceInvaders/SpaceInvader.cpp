@@ -68,7 +68,7 @@ SpaceInvader::SpaceInvader()
 	ship = new GameObject(spriteSheet, 0.0f, -0.9f, 0.0f, 0.0f, 0.0f, 0.0f / 256.0f, 156.0f / 512.0f, 112.0f / 256.0f, 75.0f / 512.0f);
 
 	Init();
-	bool done = false;
+	done = false;
 	lastFrameTicks = 0.0f;
 	const Uint8 *keys = SDL_GetKeyboardState(NULL);
 }
