@@ -1,11 +1,13 @@
 #include "GameObject.h"
 
 
-GameObject::GameObject(int spriteSheet, float posX, float posY, float dX, float dY, float rot, float uSprite, float vSprite, float w, float h, float m, bool immovable, bool collidable)
+GameObject::GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, float m, bool immovable, bool collidable)
 {
 	textureID = spriteSheet;
 	x = posX;
 	y = posY;
+	width = wi;
+	height = hi;
 	velocity_x = dX;
 	velocity_y = dY;
 	acceleration_x = 0.0f;
@@ -15,8 +17,8 @@ GameObject::GameObject(int spriteSheet, float posX, float posY, float dX, float 
 	rotation = rot;
 	u = uSprite;
 	v = vSprite;
-	width = w;
-	height = h;
+	w = wj;
+	h = hj;
 	mass = m;
 	isStatic = immovable;
 	enableCollisions = collidable;
@@ -46,7 +48,7 @@ void GameObject::DrawSprite(float scale)
 		width * scale, -height * scale, width * scale, height * scale };
 	glVertexPointer(2, GL_FLOAT, 0, quad);
 	glEnableClientState(GL_VERTEX_ARRAY);
-	GLfloat quadUVs[] = { u, v, u, v + height, u + width, v + height, u + width, v };
+	GLfloat quadUVs[] = { u, v, u, v + h, u + w, v + h, u + w, v };
 	glTexCoordPointer(2, GL_FLOAT, 0, quadUVs);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glEnable(GL_BLEND);

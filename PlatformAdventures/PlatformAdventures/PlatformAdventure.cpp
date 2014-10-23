@@ -55,7 +55,6 @@ void PrintText(GLuint fontTexture, string text, float size, float spacing, float
 	glDisableClientState(GL_COLOR_ARRAY);
 }
 
-
 PlatformAdventure::PlatformAdventure() :keys(SDL_GetKeyboardState(NULL))
 {
 	Init();
@@ -63,11 +62,13 @@ PlatformAdventure::PlatformAdventure() :keys(SDL_GetKeyboardState(NULL))
 	ResetGame();
 }
 
-
 PlatformAdventure::~PlatformAdventure()
 {
 	delete player;
 	for (GLuint i = 0; i < enemies.size(); i++) { delete enemies[i]; }
+	Mix_FreeChunk(jumpSound);
+	Mix_FreeChunk(winSound);
+	Mix_FreeMusic(music);
 	SDL_Quit();
 }
 
@@ -77,7 +78,7 @@ void PlatformAdventure::Init()
 	displayWindow = SDL_CreateWindow("PlatformAdventure", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
 	SDL_GLContext context = SDL_GL_CreateContext(displayWindow);
 	SDL_GL_MakeCurrent(displayWindow, context);
-
+	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
 	glViewport(0, 0, 800, 600);
 	glMatrixMode(GL_PROJECTION);
 	//glOrtho(-1.33 * 10, 1.33 * 10, -1.0 * 10, 1.0 * 10, -1.0, 1.0);
@@ -86,11 +87,15 @@ void PlatformAdventure::Init()
 	glMatrixMode(GL_MODELVIEW);
 	fontTexture = LoadTexture("pixel_font.png");
 	spriteSheet = LoadTexture("arne_sprites.png");
+	jumpSound = Mix_LoadWAV("jumpSound.wav");
+	winSound = Mix_LoadWAV("triumph.wav");
+	music = Mix_LoadMUS("music.mp3");
+	Mix_PlayMusic(music, -1);
 }
 
 void PlatformAdventure::LoadMap(){
 	GLuint playerSprite = LoadTexture("p1_front.png");
-	player = new GameObject(playerSprite, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, false, true);
+	player = new GameObject(playerSprite, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, false, true);
 
 	ifstream infile("level.txt");
 	string line;
@@ -156,7 +161,7 @@ bool PlatformAdventure::readLayerData(std::ifstream &stream) {
 					unsigned char val = (unsigned char)atoi(tile.c_str());
 					if (val > 0) {
 						// be careful, the tiles in this format are indexed from 1 not 0
-						levelData[y][x] = val - 1;
+						levelData[y][x] = val;
 					}
 					else {
 						levelData[y][x] = 0;
@@ -177,7 +182,7 @@ bool PlatformAdventure::readEntityData(std::ifstream &stream) {
 		string key, value;
 		getline(sStream, key, '=');
 		getline(sStream, value);
-		if (key == "Enemy") {
+		if (key == "type") {
 			type = value;
 		}
 		else if (key == "location") {
@@ -188,7 +193,12 @@ bool PlatformAdventure::readEntityData(std::ifstream &stream) {
 			float placeX = atoi(xPosition.c_str()) / 16 * TILE_SIZE;
 			float placeY = atoi(yPosition.c_str()) / 16 * -TILE_SIZE;
 			//placeEntity(type, placeX, placeY);
-			//if (type == "Enemy"){ enemies.push_back(new GameObject(spriteSheet, placeX, placeY, 0.0f, 0.0f, 0.0f, 196.0f / 256.0f, 94.0f / 256.0f, 50.0f / 256.0f, 28.0f / 256.0f, 1.0f, false, true)); }
+			enemies.push_back(new GameObject(spriteSheet, placeX, placeY, 0.75f, 0.75f, 1.5f, 0.0f, 0.0f, //width,height,dx,dy,rot
+					(float)(80 % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X, //u
+					(float)((80) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y, //v
+					1.0f / (float)SPRITE_COUNT_X, //w
+					1.0f / (float)SPRITE_COUNT_Y, //h
+					1.0f, false, true));
 		}
 	}
 	return true;
@@ -202,8 +212,8 @@ void PlatformAdventure::ResetGame(){
 	timeLeftOver = 0.0f;
 	timePassed = 0.0f;
 	player->x = 0.5f;
-	player->y = -1.0f;
-	player->velocity_x = 0.0f;
+	player->y = -6.0f+player->height*OBJECT_SIZE;
+	player->velocity_x = 0.0f;	
 	player->velocity_y = 0.0f;
 	player->acceleration_x = 0.0f;
 	player->acceleration_y = 0.0f;
@@ -211,10 +221,6 @@ void PlatformAdventure::ResetGame(){
 	player->collidedTop = false;
 	player->collidedLeft = false;
 	player->collidedRight = false;
-
-	for (GLuint i = 0; i < enemies.size(); i++) { delete enemies[i]; }
-	enemies.clear();
-
 }
 
 bool PlatformAdventure::UpdateAndRender()
@@ -242,11 +248,6 @@ float lerp(float v0, float v1, float t) {
 	return (1.0f - t)*v0 + t*v1;
 }
 
-//void worldToTileCoordinates(float worldX, float worldY, int *gridX, int *gridY) {
-//	*gridX = (int)((worldX + (WORLD_OFFSET_X)) / TILE_SIZE);
-//	*gridY = (int)((-worldY + (WORLD_OFFSET_Y)) / TILE_SIZE);
-//}
-
 int PlatformAdventure::worldToTileX(float worldX) {
 	int x =(int)((worldX + (WORLD_OFFSET_X)) / TILE_SIZE);
 	if (x<0 || x>mapWidth)return 0;
@@ -259,33 +260,70 @@ int PlatformAdventure::worldToTileY(float worldY) {
 	return y;
 }
 
+void PlatformAdventure::collideWithMapX(GameObject * obj){
+	if (obj->velocity_x < 0){
+		if ((levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE*0.9f)][worldToTileX(obj->x - obj->width*OBJECT_SIZE)]) ||
+			(levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE*0.9f)][worldToTileX(obj->x - obj->width*OBJECT_SIZE)]))
+		{
+			obj->collidedLeft = true;
+			obj->x -= obj->velocity_x * FIXED_TIMESTEP;
+			if (obj->x == player->x&& obj->y == player->y)obj->velocity_x = 0.0f;//stop for player
+			else obj->velocity_x = -obj->velocity_x;//bounce for enemies
+			obj->acceleration_x = 0.0f;
+		}
+	}
+	else if (obj->velocity_x > 0){
+		if ((levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE*0.9f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)]) ||
+			(levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE*0.9f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)]))
+		{
+			obj->collidedRight = true;
+			obj->x -= obj->velocity_x * FIXED_TIMESTEP;
+			if (obj->x == player->x&& obj->y == player->y)obj->velocity_x = 0.0f;//stop for player
+			else obj->velocity_x = -obj->velocity_x;//bounce for enemies
+			obj->acceleration_x = 0.0f;
+		}
+	}
+	else {
+		obj->collidedLeft = false;
+		obj->collidedRight = false;
+	}
+}
+
+void PlatformAdventure::collideWithMapY(GameObject * obj){
+	if (obj->velocity_y < 0){
+		if ((levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE)][worldToTileX(obj->x + obj->width*OBJECT_SIZE*0.9f)]) ||
+			(levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE)][worldToTileX(obj->x - obj->width*OBJECT_SIZE*0.9f)])){
+			obj->collidedBottom = true;
+			obj->y -= obj->velocity_y * FIXED_TIMESTEP;
+			obj->velocity_y = 0.0f; obj->acceleration_y = 0.0f;
+		}
+	}
+	else if (obj->velocity_y > 0){
+		if ((levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE)][worldToTileX(obj->x + obj->width*OBJECT_SIZE*0.9f)]) ||
+			(levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE)][worldToTileX(obj->x - obj->width*OBJECT_SIZE*0.9f)])){
+			obj->collidedTop = true;
+			obj->y -= obj->velocity_y * FIXED_TIMESTEP;
+			obj->velocity_y = 0.0f; obj->acceleration_y = 0.0f;
+		}
+	}
+	else {
+		obj->collidedTop = false;
+		obj->collidedBottom = false;
+	}
+}
+
 void PlatformAdventure::FixedUpdate(){
-	if (player->x + player->width*0.2f > 1.2f && player->y>0.35f){score = 1;}//win
+	if (worldToTileX(player->x)>=120 && score == 0){ score = 1; Mix_PlayChannel(-1, winSound, 0); }//win
 
 	//Y movement
 	player->velocity_y = lerp(player->velocity_y, 0.0f, FIXED_TIMESTEP * player->friction_y);
 	player->velocity_y += player->acceleration_y * FIXED_TIMESTEP;
 	player->y += player->velocity_y * FIXED_TIMESTEP;
 
-	if (!player->collidedBottom){ player->acceleration_y = -2.0f; }//gravity
+	if (!player->collidedBottom){ player->acceleration_y = -3.0f; }//gravity
 
 	//collision detetection Y
-	if (player->velocity_y < 0){
-		if (levelData[worldToTileY(player->y - player->height*OBJECT_SIZE)][worldToTileX(player->x)]){
-			player->collidedBottom = true;
-			player->y -= player->velocity_y * FIXED_TIMESTEP;
-			player->velocity_y = 0.0f; player->acceleration_y = 0.0f;
-		}
-	}
-	else if (player->velocity_y > 0){
-		if (levelData[worldToTileY(player->y + player->height*OBJECT_SIZE)][worldToTileX(player->x)]){
-			player->collidedTop = true;
-			player->y -= player->velocity_y * FIXED_TIMESTEP;
-			player->velocity_y = 0.0f; player->acceleration_y = 0.0f;
-		}
-	}
-	else player->collidedTop = false;
-
+	collideWithMapY(player);
 
 	//X movement
 	player->velocity_x = lerp(player->velocity_x, 0.0f, FIXED_TIMESTEP * player->friction_x);
@@ -293,65 +331,32 @@ void PlatformAdventure::FixedUpdate(){
 	player->x += player->velocity_x * FIXED_TIMESTEP;
 
 	//collision detection X
-	if (player->velocity_x < 0){
-		if (levelData[worldToTileY(player->y)][worldToTileX(player->x - player->width*OBJECT_SIZE)]){
-			player->collidedLeft = true;
-			player->x -= player->velocity_x * FIXED_TIMESTEP;
-			player->velocity_x = 0.0f; 
-			player->acceleration_x = 0.0f;
+	collideWithMapX(player);
+	
+	for (GLuint j = 0; j < enemies.size(); j++) {
+		enemies[j]->velocity_x += enemies[j]->acceleration_x * FIXED_TIMESTEP;
+		enemies[j]->x += enemies[j]->velocity_x * FIXED_TIMESTEP;
+		
+		collideWithMapX(enemies[j]);
+
+		if (enemies[j]->collidesWithX(player)){
+			ResetGame();
+			break;
+		}
+
+		enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
+		enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
+		enemies[j]->y += enemies[j]->velocity_y * FIXED_TIMESTEP;
+
+		if (!enemies[j]->collidedBottom){ enemies[j]->acceleration_y = -2.0f; }//gravity
+
+		collideWithMapY(enemies[j]);
+
+		if (enemies[j]->collidesWithY(player)){
+			ResetGame();
+			break;
 		}
 	}
-	else if (player->velocity_x > 0){
-		if (levelData[worldToTileY(player->y)][worldToTileX(player->x + player->width*OBJECT_SIZE)]){
-			player->collidedRight = true;
-			player->x -= player->velocity_x * FIXED_TIMESTEP;
-			player->velocity_x = 0.0f; 
-			player->acceleration_x = 0.0f;
-		}
-	}
-	else {
-		player->collidedLeft = false;
-		player->collidedRight = false;
-	}
-
-	//for (GLuint i = 0; i < map.size(); i++) {
-	//	if (player->collidesWithX(map[i])){
-	//		if (player->collidedLeft){ player->x = map[i]->x + map[i]->width*0.2f + player->width*0.2f; player->velocity_x = 0.0f; player->collidedLeft = false; }
-	//		else if (player->collidedRight){ player->x = map[i]->x - map[i]->width*0.2f - player->width*0.2f; player->velocity_x = 0.0f; player->collidedRight = false; }
-	//	}
-	//}
-
-	//for (GLuint j = 0; j < enemies.size(); j++) {
-	//	enemies[j]->velocity_x += enemies[j]->acceleration_x * FIXED_TIMESTEP;
-	//	enemies[j]->x += enemies[j]->velocity_x * FIXED_TIMESTEP;
-	//	for (GLuint i = 0; i < map.size(); i++) {
-	//		if (enemies[j]->collidesWithX(map[i])){
-	//			if (enemies[j]->collidedLeft){ enemies[j]->x = map[i]->x + map[i]->width*0.2f + enemies[j]->width*0.2f; enemies[j]->velocity_x = 0.5f; enemies[j]->collidedLeft = false; }
-	//			else if (enemies[j]->collidedRight){ enemies[j]->x = map[i]->x - map[i]->width*0.2f - enemies[j]->width*0.2f; enemies[j]->velocity_x = -0.5f; enemies[j]->collidedRight = false; }
-	//		}
-	//	}
-	//	if (enemies[j]->collidesWithX(player)){
-	//		ResetGame();
-	//		break;
-	//	}
-
-	//	enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
-	//	enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
-	//	enemies[j]->y += enemies[j]->velocity_y * FIXED_TIMESTEP;
-	//	if (!enemies[j]->collidedBottom){ enemies[j]->acceleration_y = -2.0f; }//gravity
-	//	for (GLuint i = 0; i < map.size(); i++) {
-	//		if (enemies[j]->collidesWithY(map[i])){
-	//			if (enemies[j]->collidedBottom){ enemies[j]->y = map[i]->y + map[i]->height*0.2f + enemies[j]->height*0.2f; enemies[j]->velocity_y = 0.0f; enemies[j]->collidedBottom = false; }
-	//			else if (enemies[j]->collidedTop){ enemies[j]->y = map[i]->y - map[i]->height*0.2f - enemies[j]->height*0.2f; enemies[j]->velocity_y = 0.0f; enemies[j]->collidedTop = false; }
-	//		}
-	//	}
-
-
-	//	if (enemies[j]->collidesWithY(player)){
-	//		ResetGame();
-	//		break;
-	//	}
-	//}
 
 }
 
@@ -359,18 +364,18 @@ void PlatformAdventure::Update(float elapsed)
 {
 	timePassed += elapsed;
 
-
 	if (keys[SDL_SCANCODE_LEFT]) {//move left
-		player->acceleration_x = -1.0f;
+		player->acceleration_x = -2.0f;
 	}
 	else if (keys[SDL_SCANCODE_RIGHT]) {//move right
-		player->acceleration_x = 1.0f;
+		player->acceleration_x = 2.0f;
 	}
 	else { player->acceleration_x = 0.0f; }
 
 	if (keys[SDL_SCANCODE_UP] && player->collidedBottom){//jump
 		player->velocity_y = 2.5f;
 		player->collidedBottom = false;
+		Mix_PlayChannel(-1, jumpSound, 0);
 	}
 
 	SDL_Event event;
@@ -380,7 +385,6 @@ void PlatformAdventure::Update(float elapsed)
 		}
 	}
 }
-
 
 void PlatformAdventure::Render()
 {
@@ -413,9 +417,9 @@ void PlatformAdventure::renderMap()
 	vector<float> texCoordData;
 	for (int y = 0; y < mapHeight; y++) {
 		for (int x = 0; x < mapWidth; x++) {
-			if (levelData[y][x] != 0) {
-				float u = (float)(((int)levelData[y][x]) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X;
-				float v = (float)(((int)levelData[y][x]) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y;
+			if (levelData[y][x]) {
+				float u = (float)(((int)levelData[y][x]-1) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X;
+				float v = (float)(((int)levelData[y][x]-1) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y;
 				float spriteWidth = 1.0f / (float)SPRITE_COUNT_X;
 				float spriteHeight = 1.0f / (float)SPRITE_COUNT_Y;
 				vertexData.insert(vertexData.end(), {

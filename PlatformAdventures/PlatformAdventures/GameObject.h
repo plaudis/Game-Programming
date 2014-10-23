@@ -7,7 +7,7 @@
 class GameObject
 {
 public:
-	GameObject(int spriteSheet, float posX, float posY, float dX, float dY, float rot, float uSprite, float vSprite, float w, float h, float m, bool immovable, bool collidable);
+	GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, float m, bool immovable, bool collidable);
 	~GameObject();
 	void DrawSprite(float scale);
 
@@ -16,12 +16,14 @@ public:
 
 	float x;
 	float y;
+	float width;
+	float height;
 	float rotation;
 	int textureID;
 	float u;
 	float v;
-	float width;
-	float height;
+	float w;
+	float h;
 
 	float velocity_x;
 	float velocity_y;

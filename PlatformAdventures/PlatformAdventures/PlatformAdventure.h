@@ -2,6 +2,7 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -17,7 +18,6 @@ public:
 
 	bool UpdateAndRender();
 
-
 private:
 	void Init();
 	void LoadMap();
@@ -32,6 +32,9 @@ private:
 	int worldToTileX(float worldX);
 	int worldToTileY(float worldY);
 
+	void collideWithMapX(GameObject* obj);
+	void collideWithMapY(GameObject* obj);
+
 	void renderMap();
 
 	int score;
@@ -44,6 +47,9 @@ private:
 	int mapWidth;
 	int mapHeight;
 	unsigned char** levelData;
+
+	Mix_Music *music;
+	Mix_Chunk *jumpSound, *winSound;
 
 	SDL_Window* displayWindow;
 
