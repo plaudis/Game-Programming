@@ -396,7 +396,15 @@ void PlatformAdventure::Render()
 	else{
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
-		glTranslatef(-player->x, -player->y, 0.0f); //scrolling
+		if (player->y>-4.4 && player->x>2*1.33)
+			glTranslatef(-player->x, -player->y, 0.0f); //scrolling
+		else{//boundary lock
+			float y = player->y;
+			float x = player->x;
+			if (y < -4.4)y = -4.4;
+			if (x < 2*1.33f)x = 2*1.33f;
+			glTranslatef(-x, -y, 0.0f);
+		}
 		renderMap();
 		for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
 		player->DrawSprite(OBJECT_SIZE);
