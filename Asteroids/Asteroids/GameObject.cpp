@@ -69,15 +69,15 @@ bool GameObject::collidesWith(GameObject *other){
 	Vector vertex2(-other->width*OBJECT_SIZE, other->height*OBJECT_SIZE, 0.0f);
 	Vector vertex3(-other->width*OBJECT_SIZE, -other->height*OBJECT_SIZE, 0.0f);
 	Vector vertex4(other->width*OBJECT_SIZE, -other->height*OBJECT_SIZE, 0.0f);
-	vertex1 = (other->matrix.inverse())*vertex1;
-	vertex2 = (other->matrix.inverse())*vertex2;
-	vertex3 = (other->matrix.inverse())*vertex3;
-	vertex4 = (other->matrix.inverse())*vertex4;
+	vertex1 = (other->matrix)*vertex1;
+	vertex2 = (other->matrix)*vertex2;
+	vertex3 = (other->matrix)*vertex3;
+	vertex4 = (other->matrix)*vertex4;
 
-	vertex1 = matrix*vertex1;
-	vertex2 = matrix*vertex2;
-	vertex3 = matrix*vertex3;
-	vertex4 = matrix*vertex4;
+	vertex1 = matrix.inverse()*vertex1;
+	vertex2 = matrix.inverse()*vertex2;
+	vertex3 = matrix.inverse()*vertex3;
+	vertex4 = matrix.inverse()*vertex4;
 
 	Vector normalX(1.0f,0.0f,0.0f);
 	Vector normalY(0.0f, 1.0f, 0.0f);

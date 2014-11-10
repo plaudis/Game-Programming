@@ -68,9 +68,9 @@ Vector Matrix::operator*(const Vector &v2)
 	Vector v(0.0f, 0.0f, 0.0f);
 	std::vector<float> v1 = { v2.x, v2.y, v2.z, 1 };
 	for (int i = 0; i < 4; i++){
-		v.x += m[0][i] * v1[i];
-		v.y += m[1][i] * v1[i];
-		v.z += m[2][i] * v1[i];
+		v.x += m[i][0] * v1[i];
+		v.y += m[i][1] * v1[i];
+		v.z += m[i][2] * v1[i];
 	}
 	return v;
 }

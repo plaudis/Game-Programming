@@ -5,7 +5,7 @@ class Vector
 {
 public:
 	Vector();
-	Vector(float x, float y, float z);
+	Vector(float xs, float ys, float zs);
 	float length();
 	Vector normalize();
 	float dot(Vector other);
