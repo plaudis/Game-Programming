@@ -14,15 +14,16 @@ public:
 	bool UpdateAndRender();
 private:
 	void Init();
-	void LoadMap();
-	void LoadTileMap();
+	void LoadAsteroids();
 	void ResetGame();
 	void FixedUpdate();
 	void Update(float elapsed);
 	void Render();
 
+
 	bool done;
 	
+
 	int score;
 	bool alive;
 	
@@ -30,11 +31,11 @@ private:
 	float timeLeftOver;
 	float timePassed;
 
-	
-
-	//GLuint spriteSheet;
+	GLuint playerSprite;
 	GameObject* player;
-	//std::vector<GameObject*> enemies;
+	GLuint asteroidSprite;
+	std::vector<GameObject*> asteroids;
+
 	SDL_Window* displayWindow;
 	const Uint8 *keys;
 };

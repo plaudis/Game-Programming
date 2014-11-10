@@ -31,6 +31,50 @@ void Matrix::identity()
 	m[3][3] = 1.0f;
 }
 
+void Matrix::scale(float w, float h){
+	m[0][0] = w;
+	m[1][1] = h;
+}
+
+void Matrix::translate(float x, float y, float z){
+	m[3][0] = x;
+	m[3][1] = y;
+	m[3][2] = z;
+}
+
+void Matrix::rotate(float deg){
+	m[0][0] = cos(deg*PI / 180.0f);
+	m[1][0] = -sin(deg*PI / 180.0f);
+	m[0][1] = sin(deg*PI / 180.0f);
+	m[1][1] = cos(deg*PI / 180.0f);
+}
+
+Matrix Matrix::operator*(const Matrix &m2)
+{	
+	Matrix result;
+	for (int i = 0; i < 4; i++){
+		for (int j = 0; j < 4; j++){
+			result.m[i][j] = 0;
+			for (int k = 0; k < 4; k++){
+				result.m[i][j] += m[i][k] * m2.m[k][j];
+			}
+		}
+	}
+	return result;
+}
+
+Vector Matrix::operator*(const Vector &v2)
+{
+	Vector v(0.0f, 0.0f, 0.0f);
+	std::vector<float> v1 = { v2.x, v2.y, v2.z, 1 };
+	for (int i = 0; i < 4; i++){
+		v.x += m[0][i] * v1[i];
+		v.y += m[1][i] * v1[i];
+		v.z += m[2][i] * v1[i];
+	}
+	return v;
+}
+
 Matrix Matrix::inverse()
 {
 	float m00 = m[0][0], m01 = m[0][1], m02 = m[0][2], m03 = m[0][3];
@@ -94,30 +138,4 @@ Matrix Matrix::inverse()
 	m2.m[3][2] = d32;
 	m2.m[3][3] = d33;
 	return m2;
-}
-
-Matrix Matrix::operator*(const Matrix &m2)
-{	
-	Matrix result;
-	for (int i = 0; i < 4; i++){//rows
-		for (int j = 0; j < 4; j++){//columns
-			result.m[i][j] = 0;
-			for (int k = 0; k < 4; k++){
-				result.m[i][j] += m[i][k] * m2.m[k][j];
-			}
-		}
-	}
-	return result;
-}
-
-Vector Matrix::operator*(const Vector &v2)
-{
-	Vector v(0.0f, 0.0f, 0.0f);
-	std::vector<float> v1 = { v2.x, v2.y, v2.z, 1 };
-	for (int i = 0; i < 4; i++){
-		v.x += m[0][i] * v1[i];
-		v.y += m[1][i] * v1[i];
-		v.z += m[2][i] * v1[i];
-	}
-	return v;
 }

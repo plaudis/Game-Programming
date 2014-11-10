@@ -1,17 +1,20 @@
 #include "GameObject.h"
 
-GameObject::GameObject(int sprite, float posX, float posY, float w, float h, float v, float rot, float dR, float m)
+#define OBJECT_SIZE 0.1f
+
+GameObject::GameObject(int sprite, float posX, float posY, float w, float h, float vx, float vy, float rot, float dR, float m)
 {
 	textureID = sprite;
 	x = posX;
 	y = posY;
 	width = w;
 	height = h;
-	velocity = v;
+	velocity_x = vx;
+	velocity_y = vy;
 	acceleration = 0.0f;
 	rotationDegrees = rot;
-	rotationVelocity = 0.0f;
-	rotationAcceleration = dR;
+	rotationVelocity = dR;
+	rotationAcceleration = 0.0f;
 	mass = m;
 	collidedBottom = false;
 	collidedTop = false;
@@ -26,19 +29,20 @@ GameObject::~GameObject()
 }
 
 
-void GameObject::DrawSprite(float scale)
+void GameObject::DrawSprite()
 {
 	buildMatrix();
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, textureID);
 	glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
+	
 	glPushMatrix();
+	//glLoadIdentity();
 	//glTranslatef(x, y, 0.0);
 	//glRotatef(rotationDegrees, 0.0, 0.0, 1.0);
 	glMultMatrixf(matrix.ml);
-	GLfloat quad[] = { -width * scale, height * scale, -width * scale, -height * scale,
-		width * scale, -height * scale, width * scale, height * scale };
+	GLfloat quad[] = { -width * OBJECT_SIZE, height * OBJECT_SIZE, -width * OBJECT_SIZE, -height * OBJECT_SIZE,
+		width * OBJECT_SIZE, -height * OBJECT_SIZE, width * OBJECT_SIZE, height * OBJECT_SIZE };
 	glVertexPointer(2, GL_FLOAT, 0, quad);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	GLfloat quadUVs[] = { 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0 };
@@ -53,31 +57,47 @@ void GameObject::DrawSprite(float scale)
 
 void GameObject::buildMatrix(){
 	Matrix scale, translate, rotate;
-	scale.m[0][0] = width;
-	scale.m[1][1] = height;
-	translate.m[0][3] = x;
-	translate.m[1][3] = y;
-	rotate.m[0][0] = cos(rotationDegrees*PI / 180.0f);
-	rotate.m[0][1] = -sin(rotationDegrees*PI / 180.0f);
-	rotate.m[1][0] = sin(rotationDegrees*PI / 180.0f);
-	rotate.m[1][1] = cos(rotationDegrees*PI / 180.0f);
+	scale.scale(width, height);
+	translate.translate(x, y, 0.0);
+	rotate.rotate(rotationDegrees);
 	matrix = scale*rotate*translate;
 }
 
 bool GameObject::collidesWith(GameObject *other){
-	//if (y - height*0.2f < other->y + other->height*0.2f && y - height*0.2f > other->y - other->height*0.2f &&
-	//	((x - width*0.2f < other->x + other->width*0.2f&&x - width*0.1f > other->x - other->width*0.2f) ||
-	//	(x + width*0.2f > other->x - other->width*0.2f&&x + width*0.1f < other->x + other->width*0.2f))){
-	//	collidedBottom = true;
-	//	/*y = other->y + other->height*0.2f + height*0.2f;
-	//	velocity_y = 0.0f;*/
-	//	return true;
-	//}
-	//else if (y + height*0.2f < other->y + other->height*0.2f && y + height*0.2f > other->y - other->height*0.2f &&
-	//	((x - width*0.2f < other->x + other->width*0.2f&&x - width*0.1f > other->x - other->width*0.2f) ||
-	//	(x + width*0.2f > other->x - other->width*0.2f&&x + width*0.1f < other->x + other->width*0.2f))){
-	//	collidedTop = true;
-	//	return true;
-	//}
+	buildMatrix();
+	Vector vertex1(other->width*OBJECT_SIZE, other->height*OBJECT_SIZE, 0.0f);
+	Vector vertex2(-other->width*OBJECT_SIZE, other->height*OBJECT_SIZE, 0.0f);
+	Vector vertex3(-other->width*OBJECT_SIZE, -other->height*OBJECT_SIZE, 0.0f);
+	Vector vertex4(other->width*OBJECT_SIZE, -other->height*OBJECT_SIZE, 0.0f);
+	vertex1 = (other->matrix.inverse())*vertex1;
+	vertex2 = (other->matrix.inverse())*vertex2;
+	vertex3 = (other->matrix.inverse())*vertex3;
+	vertex4 = (other->matrix.inverse())*vertex4;
+
+	vertex1 = matrix*vertex1;
+	vertex2 = matrix*vertex2;
+	vertex3 = matrix*vertex3;
+	vertex4 = matrix*vertex4;
+
+	Vector normalX(1.0f,0.0f,0.0f);
+	Vector normalY(0.0f, 1.0f, 0.0f);
+
+	std::vector<float> x;
+	std::vector<float> y;
+	x.push_back(normalX.dot(vertex1));
+	x.push_back(normalX.dot(vertex2));
+	x.push_back(normalX.dot(vertex3));
+	x.push_back(normalX.dot(vertex4));
+	std::sort(x.begin(), x.end());
+	y.push_back(normalY.dot(vertex1));
+	y.push_back(normalY.dot(vertex2));
+	y.push_back(normalY.dot(vertex3));
+	y.push_back(normalY.dot(vertex4));
+	std::sort(y.begin(), y.end());
+
+	if (((height*OBJECT_SIZE > y[0] && height*OBJECT_SIZE<y[3]) || (-height*OBJECT_SIZE>y[0] && -height*OBJECT_SIZE < y[3]))&&
+		((width*OBJECT_SIZE > x[0] && width*OBJECT_SIZE<x[3]) || (-width*OBJECT_SIZE>x[0] && -width*OBJECT_SIZE < x[3]))){
+		return true;
+	}
 	return false;
 }

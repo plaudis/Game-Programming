@@ -7,7 +7,9 @@ public:
 	Vector();
 	Vector(float x, float y, float z);
 	float length();
-	void normalize();
+	Vector normalize();
+	float dot(Vector other);
+
 	float x;
 	float y;
 	float z;

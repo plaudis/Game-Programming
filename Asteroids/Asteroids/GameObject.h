@@ -3,6 +3,7 @@
 #include <SDL_opengl.h>
 #include <SDL_image.h>
 #include <math.h> 
+#include <algorithm>
 #include <Matrix.h>
 
 #define PI 3.14159265f
@@ -10,9 +11,9 @@
 class GameObject
 {
 public:
-	GameObject(int sprite, float posX, float posY, float w, float h, float v, float rot, float dR, float m);
+	GameObject(int sprite, float posX, float posY, float w, float h, float vx, float vy, float rot, float dR, float m);
 	~GameObject();
-	void DrawSprite(float scale);
+	void DrawSprite();
 	void buildMatrix();
 
 	bool collidesWith(GameObject *other);
@@ -28,11 +29,8 @@ public:
 	float rotationAcceleration;
 	int textureID;
 
-	/*float velocity_x;
+	float velocity_x;
 	float velocity_y;
-	float acceleration_x;
-	float acceleration_y;*/
-	float velocity;
 	float acceleration;
 	float mass;
 

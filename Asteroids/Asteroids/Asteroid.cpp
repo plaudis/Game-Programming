@@ -3,8 +3,6 @@
 #define FIXED_TIMESTEP 0.0166666f // 60 FPS (1.0f/60.0f)
 #define MAX_TIMESTEPS 6
 
-#define OBJECT_SIZE 0.2f
-
 using namespace std;
 
 GLuint LoadTexture(const char *image_path) {
@@ -22,18 +20,17 @@ GLuint LoadTexture(const char *image_path) {
 	return textureID;
 }
 
-Asteroid::Asteroid()
+Asteroid::Asteroid() :keys(SDL_GetKeyboardState(NULL))
 {
 	Init();
-	//LoadMap();
 	ResetGame();
 }
 
 
 Asteroid::~Asteroid()
 {
-	//delete player;
-	//for (GLuint i = 0; i < enemies.size(); i++) { delete enemies[i]; }
+	delete player;
+	for (GLuint i = 0; i < asteroids.size(); i++) { delete asteroids[i]; }
 	SDL_Quit();
 }
 
@@ -48,11 +45,16 @@ void Asteroid::Init()
 	//glOrtho(-1.33 * 10, 1.33 * 10, -1.0 * 10, 1.0 * 10, -1.0, 1.0);
 	glOrtho(-1.33 , 1.33 , -1.0 , 1.0 , -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
-	//spriteSheet = LoadTexture("arne_sprites.png");
-	GLuint playerSprite = LoadTexture("player.png");
-	//int sprite, float posX, float posY, float w, float h, float v, float rot, float dR, float m
-	player = new GameObject(playerSprite, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	playerSprite = LoadTexture("player.png");
+	asteroidSprite = LoadTexture("asteroid.png");
+	//int sprite, float posX, float posY, float w, float h, float vx, float vy, float rot, float dR, float m
+	player = new GameObject(playerSprite, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 
+}
+
+void Asteroid::LoadAsteroids(){
+	for (GLuint i = 0; i < asteroids.size(); i++) { delete asteroids[i]; }
+	for (GLuint i = 0; i<1; i++) { asteroids.push_back(new GameObject(asteroidSprite, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 180.0f, 1.0f)); }
 }
 
 void Asteroid::ResetGame(){
@@ -64,12 +66,14 @@ void Asteroid::ResetGame(){
 	timePassed = 0.0f;
 	player->x = 0.0f;
 	player->y = 0.0f;
-	player->velocity = 0.0f;
+	player->velocity_x = 0.0f;
+	player->velocity_y = 0.0f;
 	player->acceleration = 0.0f;
 	player->collidedBottom = false;
 	player->collidedTop = false;
 	player->collidedLeft = false;
 	player->collidedRight = false;
+	LoadAsteroids();
 }
 
 bool Asteroid::UpdateAndRender()
@@ -98,70 +102,75 @@ float lerp(float v0, float v1, float t) {
 }
 
 void Asteroid::FixedUpdate(){
+	//Rotation
+	player->rotationVelocity = lerp(player->rotationVelocity, 0.0f, FIXED_TIMESTEP * player->mass);
+	player->rotationVelocity += player->rotationAcceleration * FIXED_TIMESTEP;
+	player->rotationDegrees += player->rotationVelocity * FIXED_TIMESTEP;
+
+	if (player->rotationDegrees > 360.0f)player->rotationDegrees -= 360.0f;		//limit the angle
+	else if (player->rotationDegrees < -360.0f)player->rotationDegrees += 360.0f;
+	
 
 	////Y movement
-	//player->velocity_y = lerp(player->velocity_y, 0.0f, FIXED_TIMESTEP * player->friction_y);
-	//player->velocity_y += player->acceleration_y * FIXED_TIMESTEP;
-	//player->y += player->velocity_y * FIXED_TIMESTEP;
-
-	//if (!player->collidedBottom){ player->acceleration_y = -3.0f; }//gravity
-
-	////collision detetection Y
-	//collideWithMapY(player);
+	player->velocity_y = lerp(player->velocity_y, 0.0f, FIXED_TIMESTEP * player->mass);
+	player->velocity_y += player->acceleration * cos(player->rotationDegrees*PI / 180.0f) * FIXED_TIMESTEP;
+	player->y += player->velocity_y * FIXED_TIMESTEP;
 
 	////X movement
-	//player->velocity_x = lerp(player->velocity_x, 0.0f, FIXED_TIMESTEP * player->friction_x);
-	//player->velocity_x += player->acceleration_x * FIXED_TIMESTEP;
-	//player->x += player->velocity_x * FIXED_TIMESTEP;
+	player->velocity_x = lerp(player->velocity_x, 0.0f, FIXED_TIMESTEP * player->mass);
+	player->velocity_x += player->acceleration * -sin(player->rotationDegrees*PI / 180.0f) * FIXED_TIMESTEP;
+	player->x += player->velocity_x * FIXED_TIMESTEP;
 
-	////collision detection X
-	//collideWithMapX(player);
+	//limit the movement
+	if (player->x>1.33f)player->x = 1.33f;
+	else if (player->x<-1.33f)player->x = -1.33f;
 
-	//for (GLuint j = 0; j < enemies.size(); j++) {
-	//	enemies[j]->velocity_x += enemies[j]->acceleration_x * FIXED_TIMESTEP;
-	//	enemies[j]->x += enemies[j]->velocity_x * FIXED_TIMESTEP;
+	if (player->y>1.0f)player->y = 1.0f;
+	else if (player->y<-1.0f)player->y = -1.0f;
 
-	//	collideWithMapX(enemies[j]);
+	//Move asteroids
+	for (GLuint j = 0; j < asteroids.size(); j++) {
+		asteroids[j]->x += asteroids[j]->velocity_x * FIXED_TIMESTEP;
+		asteroids[j]->y += asteroids[j]->velocity_y * FIXED_TIMESTEP;
+		asteroids[j]->rotationDegrees += asteroids[j]->rotationVelocity * FIXED_TIMESTEP;
+		//collision detection
+		if (player->collidesWith(asteroids[j]) && asteroids[j]->collidesWith(player)){ asteroids[j]->x = -asteroids[j]->x; }
+	}
+	////collision detection 
 
 	//	if (enemies[j]->collidesWithX(player)){
 	//		ResetGame();
 	//		break;
 	//	}
-
-	//	enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
-	//	enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
-	//	enemies[j]->y += enemies[j]->velocity_y * FIXED_TIMESTEP;
-
-	//	if (!enemies[j]->collidedBottom){ enemies[j]->acceleration_y = -2.0f; }//gravity
-
-	//	collideWithMapY(enemies[j]);
-
-	//	if (enemies[j]->collidesWithY(player)){
-	//		ResetGame();
-	//		break;
-	//	}
-	//}
-
 }
 
 void Asteroid::Update(float elapsed)
 {
 	timePassed += elapsed;
 
-	if (keys[SDL_SCANCODE_UP]) {//move forward
+	if (keys[SDL_SCANCODE_UP] && keys[SDL_SCANCODE_DOWN]) {//Don't move
+		player->acceleration = 0.0f;
+	}
+	else if (keys[SDL_SCANCODE_UP]) {//move forward
 		player->acceleration = 2.0f;
 	}
 	else if (keys[SDL_SCANCODE_DOWN]) {//move back
 		player->acceleration = -2.0f;
 	}
+	else {
+		player->acceleration = 0.0f;
+	}
+	
+	if (keys[SDL_SCANCODE_LEFT] && keys[SDL_SCANCODE_RIGHT]) {//Don't rotate
+		player->rotationAcceleration = 0.0;
+	}
 	else if (keys[SDL_SCANCODE_LEFT]) {//rotate counter-clockwise
-		player->rotationAcceleration = -1.0;
+		player->rotationAcceleration = 180.0;
 	}
 	else if (keys[SDL_SCANCODE_RIGHT]) {//rotate clockwise
-		player->rotationAcceleration = 1.0;
+		player->rotationAcceleration = -180.0;
 	}
 	else {
-		player->acceleration = 0.0f; 
 		player->rotationAcceleration = 0.0f;
 	}
 
@@ -182,12 +191,8 @@ void Asteroid::Render()
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-		//if (player->y>-4.4 && player->x>2 * 1.33)
-		//	glTranslatef(-player->x, -player->y, 0.0f); //scrolling
-	
-		//renderMap();
-	//for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
-	//player->DrawSprite(OBJECT_SIZE);
+	for (GLuint i = 0; i < asteroids.size(); i++) { asteroids[i]->DrawSprite(); }
+	player->DrawSprite();
 	glPopMatrix();
 	SDL_GL_SwapWindow(displayWindow);
 }

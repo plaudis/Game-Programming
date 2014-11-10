@@ -2,6 +2,8 @@
 #include <vector>
 #include <Vector.h>
 
+#define PI 3.14159265f
+
 class Matrix
 {
 public:
@@ -14,6 +16,10 @@ public:
 	~Matrix();
 
 	void identity();
+	void scale(float w, float h);
+	void translate(float x, float y, float z);
+	void rotate(float deg);
+
 	Matrix inverse();
 	Matrix operator * (const Matrix &m2);
 	Vector operator * (const Vector &v2);
