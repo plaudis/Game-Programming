@@ -24,12 +24,18 @@
     <ClCompile Include="PlatformAdventure.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="particleEmitter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PlatformAdventure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="particleEmitter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -221,6 +221,8 @@ void PlatformAdventure::ResetGame(){
 	player->collidedTop = false;
 	player->collidedLeft = false;
 	player->collidedRight = false;
+	for (GLuint i = 0; i < deletedEnemies.size(); i++) { enemies.push_back(deletedEnemies[i]); }
+	deletedEnemies.clear();
 }
 
 bool PlatformAdventure::UpdateAndRender()
@@ -295,6 +297,7 @@ void PlatformAdventure::collideWithMapY(GameObject * obj){
 			(levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE)][worldToTileX(obj->x - obj->width*OBJECT_SIZE*0.9f)])){
 			obj->collidedBottom = true;
 			obj->y -= obj->velocity_y * FIXED_TIMESTEP;
+			if (obj->velocity_y < -1.0f){ shakeValue = 0.02f; }//shake screen
 			obj->velocity_y = 0.0f; obj->acceleration_y = 0.0f;
 		}
 	}
@@ -314,6 +317,9 @@ void PlatformAdventure::collideWithMapY(GameObject * obj){
 
 void PlatformAdventure::FixedUpdate(){
 	if (worldToTileX(player->x)>=120 && score == 0){ score = 1; Mix_PlayChannel(-1, winSound, 0); }//win
+
+	shakeValue = lerp(shakeValue,0.0f,FIXED_TIMESTEP);//gradually shake less
+	if (shakeValue < 0.01f)shakeValue = 0.0f;//stop shaking after a while
 
 	//Y movement
 	player->velocity_y = lerp(player->velocity_y, 0.0f, FIXED_TIMESTEP * player->friction_y);
@@ -353,7 +359,9 @@ void PlatformAdventure::FixedUpdate(){
 		collideWithMapY(enemies[j]);
 
 		if (enemies[j]->collidesWithY(player)){
-			ResetGame();
+			particleSource = new particleEmitter(enemies[j]->x, enemies[j]->y);
+			deletedEnemies.push_back(enemies[j]);
+			enemies.erase(enemies.begin() + j);
 			break;
 		}
 	}
@@ -362,6 +370,7 @@ void PlatformAdventure::FixedUpdate(){
 
 void PlatformAdventure::Update(float elapsed)
 {
+	if (particleSource)particleSource->Update(elapsed);
 	timePassed += elapsed;
 
 	if (keys[SDL_SCANCODE_LEFT]) {//move left
@@ -401,13 +410,16 @@ void PlatformAdventure::Render()
 		else{//boundary lock
 			float y = player->y;
 			float x = player->x;
-			if (y < -4.4)y = -4.4;
+			if (y < -4.4f)y = -4.4f;
 			if (x < 2*1.33f)x = 2*1.33f;
 			glTranslatef(-x, -y, 0.0f);
 		}
+		//glTranslatef(noise1(perlinValue), noise1(perlinValue + 10.0), 0.0);
+		glTranslatef(0.0f, sin(timePassed *50)*shakeValue, 0.0f);//shake screen
 		renderMap();
 		for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
 		player->DrawSprite(OBJECT_SIZE);
+		if (particleSource) particleSource->Render();
 		glPopMatrix();
 	}
 	SDL_GL_SwapWindow(displayWindow);

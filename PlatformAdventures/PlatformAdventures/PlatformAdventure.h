@@ -9,6 +9,8 @@
 #include <iostream>
 #include <sstream>
 #include "GameObject.h"
+#include "PerlinNoise.h"
+#include "particleEmitter.h"
 
 class PlatformAdventure
 {
@@ -57,6 +59,11 @@ private:
 	GLuint spriteSheet;
 	GameObject* player;
 	std::vector<GameObject*> enemies;
+	std::vector<GameObject*> deletedEnemies;
+
+	particleEmitter * particleSource;
+
+	float shakeValue;
 
 	const Uint8 *keys;
 };

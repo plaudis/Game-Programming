@@ -34,6 +34,16 @@ GameObject::~GameObject()
 {
 }
 
+float mapValue(float value, float srcMin, float srcMax, float dstMin, float dstMax) {
+	float retVal = dstMin + ((value - srcMin) / (srcMax - srcMin) * (dstMax - dstMin));
+	if (retVal < dstMin) {
+		retVal = dstMin;
+	}
+	if (retVal > dstMax) {
+		retVal = dstMax;
+	}
+	return retVal;
+}
 
 void GameObject::DrawSprite(float scale)
 {
@@ -44,8 +54,10 @@ void GameObject::DrawSprite(float scale)
 	glPushMatrix();
 	glTranslatef(x, y, 0.0);
 	glRotatef(rotation, 0.0, 0.0, 1.0);
-	GLfloat quad[] = { -width * scale, height * scale, -width * scale, -height * scale,
-		width * scale, -height * scale, width * scale, height * scale };
+	float scale_y = mapValue(fabs(velocity_y), 0.0, 5.0, 1.0, 1.6);
+	float scale_x = mapValue(fabs(velocity_x), 5.0, 0.0, 0.8, 1.0);
+	GLfloat quad[] = { -width * scale*scale_x, height * scale*scale_y, -width * scale*scale_x, -height * scale*scale_y,
+		width * scale*scale_x, -height * scale*scale_y, width * scale*scale_x, height * scale*scale_y };
 	glVertexPointer(2, GL_FLOAT, 0, quad);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	GLfloat quadUVs[] = { u, v, u, v + h, u + w, v + h, u + w, v };
