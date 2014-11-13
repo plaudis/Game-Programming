@@ -54,8 +54,8 @@ void GameObject::DrawSprite(float scale)
 	glPushMatrix();
 	glTranslatef(x, y, 0.0);
 	glRotatef(rotation, 0.0, 0.0, 1.0);
-	float scale_y = mapValue(fabs(velocity_y), 0.0, 5.0, 1.0, 1.6);
-	float scale_x = mapValue(fabs(velocity_x), 5.0, 0.0, 0.8, 1.0);
+	float scale_y = mapValue(fabs(velocity_y), 0.0f, 5.0f, 1.0f, 1.6f);
+	float scale_x = mapValue(fabs(velocity_x), 5.0f, 0.0f, 0.8f, 1.0f);
 	GLfloat quad[] = { -width * scale*scale_x, height * scale*scale_y, -width * scale*scale_x, -height * scale*scale_y,
 		width * scale*scale_x, -height * scale*scale_y, width * scale*scale_x, height * scale*scale_y };
 	glVertexPointer(2, GL_FLOAT, 0, quad);

@@ -41,5 +41,6 @@ void particleEmitter::Render()
 	}
 	glVertexPointer(2, GL_FLOAT, 0, particleVertices.data());
 	glEnableClientState(GL_VERTEX_ARRAY);
+	glPointSize(3.0);
 	glDrawArrays(GL_POINTS, 0, particleVertices.size() / 2);
 }
