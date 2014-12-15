@@ -1,0 +1,11 @@
+Texture height="13" width="37" y="96" x="0" name="laserBlue.png"
+
+Texture height="46" width="48" y="48" x="0" name="laserBlueExploded1.png"
+
+Texture height="46" width="48" y="0" x="0" name="laserBlueExploded2.png"
+
+Texture height="13" width="37" y="111" x="0" name="laserGreen.png"
+
+Texture height="46" width="48" y="0" x="50" name="laserGreenExploded1.png"
+
+Texture height="46" width="48" y="48" x="50" name="laserGreenExploded2.png"

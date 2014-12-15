@@ -8,7 +8,7 @@
 class GameObject
 {
 public:
-	GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, float m, bool flip, bool collidable);
+	GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, int hit, bool flip);
 	~GameObject();
 	void DrawSprite(float scale);
 
@@ -32,10 +32,10 @@ public:
 	float acceleration_y;
 	float friction_x;
 	float friction_y;
-	float mass;
+	int hits;
+	int powerUp;
 
 	bool flipped;
-	bool enableCollisions;
 	bool collidedTop;
 	bool collidedBottom;
 	bool collidedLeft;

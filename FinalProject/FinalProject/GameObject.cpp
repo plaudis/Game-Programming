@@ -1,7 +1,7 @@
 #include "GameObject.h"
 #define OBJECT_SIZE 0.2f
 
-GameObject::GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, float m, bool flip, bool collidable)
+GameObject::GameObject(int spriteSheet, float posX, float posY, float wi, float hi, float dX, float dY, float rot, float uSprite, float vSprite, float wj, float hj, int hit, bool flip)
 {
 	textureID = spriteSheet;
 	x = posX;
@@ -19,30 +19,17 @@ GameObject::GameObject(int spriteSheet, float posX, float posY, float wi, float 
 	v = vSprite;
 	w = wj;
 	h = hj;
-	mass = m;
+	hits = hit;
 	flipped = flip;
-	enableCollisions = collidable;
+	powerUp = 0;
 	collidedBottom = false;
 	collidedTop = false;
 	collidedRight = false;
 	collidedLeft = false;
 }
 
-
-
 GameObject::~GameObject()
 {
-}
-
-float mapValue(float value, float srcMin, float srcMax, float dstMin, float dstMax) {
-	float retVal = dstMin + ((value - srcMin) / (srcMax - srcMin) * (dstMax - dstMin));
-	if (retVal < dstMin) {
-		retVal = dstMin;
-	}
-	if (retVal > dstMax) {
-		retVal = dstMax;
-	}
-	return retVal;
 }
 
 void GameObject::DrawSprite(float scale)
@@ -50,12 +37,9 @@ void GameObject::DrawSprite(float scale)
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, textureID);
 	glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
 	glPushMatrix();
 	glTranslatef(x, y, 0.0);
 	glRotatef(rotation, 0.0, 0.0, 1.0);
-	//float scale_y = mapValue(fabs(velocity_y), 0.0f, 5.0f, 1.0f, 1.6f);
-	//float scale_x = mapValue(fabs(velocity_x), 5.0f, 0.0f, 0.8f, 1.0f);
 	float scale_x = 1.0f;
 	float scale_y = 1.0f;
 	GLfloat quad[] = { -width * scale*scale_x, height * scale*scale_y, -width * scale*scale_x, -height * scale*scale_y,
@@ -87,8 +71,6 @@ bool GameObject::collidesWithY(GameObject *other){
 		((x - width*OBJECT_SIZE < other->x + other->width*OBJECT_SIZE&&x - width*OBJECT_SIZE > other->x - other->width*OBJECT_SIZE) ||
 		(x + width*OBJECT_SIZE > other->x - other->width*OBJECT_SIZE&&x + width*OBJECT_SIZE < other->x + other->width*OBJECT_SIZE))){
 		collidedBottom = true;
-		/*y = other->y + other->height*0.2f + height*0.2f;
-		velocity_y = 0.0f;*/
 		return true;
 	}
 	else if (y + height*OBJECT_SIZE < other->y + other->height*OBJECT_SIZE && y + height*OBJECT_SIZE > other->y - other->height*OBJECT_SIZE &&
