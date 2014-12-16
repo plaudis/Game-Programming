@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <time.h>
 #include "GameObject.h"
 
 class Alienated
@@ -74,6 +75,7 @@ private:
 
 	SDL_Window* displayWindow;
 
+	GLuint title;
 	GLuint background;
 	GLuint fontTexture;
 	GLuint spriteSheet;
@@ -81,6 +83,7 @@ private:
 	GameObject* player;
 	GameObject* rival;
 	std::vector<GameObject*> playerLasers;
+	std::vector<GameObject*> plasmaLocations;
 	std::vector<GameObject*> enemies;
 	std::vector<GameObject*> deletedEnemies;
 

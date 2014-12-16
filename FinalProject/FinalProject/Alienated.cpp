@@ -97,6 +97,7 @@ void Alienated::Init()
 	glOrtho(-1.33 * 2, 1.33 * 2, -1.0 * 2, 1.0 * 2, -1.0, 1.0);
 	//glOrtho(-1.33 * 10, 1.33 * 10, -1.0 * 10, 1.0 * 10, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
+	title = LoadTexture("title.png");
 	background = LoadTexture("outer_space.png");
 	fontTexture = LoadTexture("font.png");
 	spriteSheet = LoadTexture("tiles_spritesheet.png");
@@ -125,6 +126,9 @@ void Alienated::LoadTileMap(){
 			readLayerData(infile);
 		}
 		else if (line == "[Players]") {
+			readEntityData(infile);
+		}
+		else if (line == "[Plasma]") {
 			readEntityData(infile);
 		}
 	}
@@ -210,6 +214,7 @@ bool Alienated::readEntityData(std::ifstream &stream) {
 			float placeY = atoi(yPosition.c_str()) / 70 * -TILE_SIZE;
 			if (type == "player"){ player->x = placeX; player->y = placeY; }
 			else if (type == "player2"){ rival->x = placeX; rival->y = placeY; }
+			else if (type == "plasma"){ plasmaLocations.push_back(new GameObject(LoadTexture("plasma.png"), placeX, placeY, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f , 0.0f, 1.0f, 1.0f, 0, false)); }
 			//placeEntity(type, placeX, placeY);
 			//enemies.push_back(new GameObject(spriteSheet, placeX, placeY, 0.75f, 0.75f, 1.5f, 0.0f, 0.0f, //width,height,dx,dy,rot
 			//	(float)(80 % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X, //u
@@ -223,7 +228,6 @@ bool Alienated::readEntityData(std::ifstream &stream) {
 }
 
 void Alienated::ResetGame(){
-	LoadTileMap();
 	state = 1;
 	selection = 1;
 	score = 0;
@@ -232,8 +236,14 @@ void Alienated::ResetGame(){
 	lastFrameTicks = 0.0f;
 	timeLeftOver = 0.0f;
 	timePassed = 0.0f;
+	srand(time(NULL));
+	for (GLuint i = 0; i < plasmaLocations.size(); i++) { delete plasmaLocations[i]; }
+	plasmaLocations.clear();
+	LoadTileMap();
+	plasmaLocations[rand() % plasmaLocations.size()]->flipped = true;
 	walkAnimationTime = 0.0f;
 	player->hits = 0;
+	player->bullets = 3;
 	player->velocity_x = 0.0f;
 	player->velocity_y = 0.0f;
 	player->acceleration_x = 0.0f;
@@ -244,6 +254,7 @@ void Alienated::ResetGame(){
 	player->collidedRight = false;
 	walk2AnimationTime = 0.0f;
 	rival->hits = 0;
+	rival->bullets = 3;
 	rival->velocity_x = 0.0f;
 	rival->velocity_y = 0.0f;
 	rival->acceleration_x = 0.0f;
@@ -508,10 +519,10 @@ void Alienated::FixedUpdate(){
 	shakeValue = lerp(shakeValue, 0.0f, FIXED_TIMESTEP);//gradually shake less
 	if (shakeValue < 0.01f)shakeValue = 0.0f;//stop shaking after a while
 
-	//moveAround(player);
-	//moveAround(rival);
+	moveAround(player);
+	moveAround(rival);
 
-	moveAround2P(player, rival);
+	//moveAround2P(player, rival);
 
 	//collide enemies
 	for (GLuint j = 0; j < enemies.size(); j++) {
@@ -539,6 +550,31 @@ void Alienated::FixedUpdate(){
 			enemies.erase(enemies.begin() + j);
 			break;
 		}
+	}
+
+	//plasma
+	for (GLuint i = 0; i < plasmaLocations.size(); i++) { 
+		if (plasmaLocations[i]->flipped){
+			if (plasmaLocations[i]->collidesWithY(player) || plasmaLocations[i]->collidesWithX(player)){
+				player->bullets += 3;
+				plasmaLocations[i]->flipped = false;
+				GLuint next = rand() % plasmaLocations.size();
+				while (next == i)next = rand() % plasmaLocations.size();
+				plasmaLocations[next]->flipped = true;
+			}
+			else if (plasmaLocations[i]->collidesWithY(rival) || plasmaLocations[i]->collidesWithX(rival)){
+				rival->bullets += 3;
+				plasmaLocations[i]->flipped = false;
+				GLuint next = rand() % plasmaLocations.size();
+				while (next == i)next = rand() % plasmaLocations.size();
+				plasmaLocations[next]->flipped = true;
+			}
+			else {
+				plasmaLocations[i]->rotation += 360.0f*FIXED_TIMESTEP;
+			}
+
+		}
+	
 	}
 
 	//collide lasers
@@ -787,12 +823,15 @@ void Alienated::Update(float elapsed)
 				state = 4;
 			}
 			if (event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
-				if (keys[SDL_SCANCODE_UP]){
-					playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.1f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-				}
-				else{
-					playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-					if (player->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+				if (player->bullets){
+					player->bullets -= 1;
+					if (keys[SDL_SCANCODE_UP]){
+						playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.1f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+					}
+					else{
+						playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+						if (player->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+					}
 				}
 			}
 			else if (event.key.keysym.scancode == SDL_SCANCODE_UP && player->collidedBottom){
@@ -801,12 +840,15 @@ void Alienated::Update(float elapsed)
 				Mix_PlayChannel(-1, jumpSound, 0);
 			}
 			if (event.key.keysym.scancode == SDL_SCANCODE_LCTRL) {
-				if (keys[SDL_SCANCODE_W]){
-					playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-				}
-				else{
-					playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-					if (rival->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+				if (rival->bullets){
+					rival->bullets -= 1;
+					if (keys[SDL_SCANCODE_W]){
+						playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+					}
+					else{
+						playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+						if (rival->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+					}
 				}
 			}
 			else if (event.key.keysym.scancode == SDL_SCANCODE_W && rival->collidedBottom){
@@ -839,6 +881,14 @@ void Alienated::Render()
 	drawLives();
 	for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
 	for (GLuint i = 0; i < playerLasers.size(); i++) { playerLasers[i]->DrawSprite(OBJECT_SIZE); }
+	for (GLuint i = 0; i < plasmaLocations.size(); i++) { if (plasmaLocations[i]->flipped)plasmaLocations[i]->DrawSprite(OBJECT_SIZE); }
+	glLoadIdentity();
+	glTranslatef(-2.4f, 1.7f, 0.0);
+	PrintText(fontTexture, to_string(rival->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+	glLoadIdentity();
+	glTranslatef(2.2f, 1.7f, 0.0);
+	if (player->bullets <= 9)glTranslatef(0.2f, 0.0f, 0.0);
+	PrintText(fontTexture, to_string(player->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
 	glPopMatrix();
 	SDL_GL_SwapWindow(displayWindow);
 }
@@ -951,8 +1001,21 @@ void Alienated::RenderMenu(){
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	glTranslatef(-1.5f, 1.0f, 0.0);
-	PrintText(fontTexture, "ALIENATED", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	glTranslatef(0.0f, 1.0f, 0.0f);
+	/*PrintText(fontTexture, "ALIENATED", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);*/
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, title);
+	GLfloat quad[] = { -2.66f, 2.66f * 150 / 800, -2.66f, -2.66f * 150 / 800, 2.66f, -2.66f * 150 / 800, 2.66f, 2.66f * 150 / 800 };
+	glVertexPointer(2, GL_FLOAT, 0, quad);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	GLfloat quadUVs[] = { 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0 };
+	glTexCoordPointer(2, GL_FLOAT, 0, quadUVs);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDrawArrays(GL_QUADS, 0, 4);
+	glDisable(GL_BLEND);
+	glDisable(GL_TEXTURE_2D);
 	glLoadIdentity();
 	glTranslatef(-0.9f, 0.0f, 0.0);
 	if(selection == 1)PrintText(fontTexture, "PVP Arena", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);

@@ -33,4 +33,13 @@
   <object name="player2Position" type="player2" gid="1" x="165" y="321"/>
   <object name="playerPosition" type="player" gid="1" x="1581" y="1397"/>
  </objectgroup>
+ <objectgroup name="Plasma">
+  <object type="plasma" gid="38" x="1700" y="320"/>
+  <object type="plasma" gid="38" x="950" y="320"/>
+  <object type="plasma" gid="38" x="375" y="1371"/>
+  <object type="plasma" gid="38" x="730" y="680"/>
+  <object type="plasma" gid="38" x="1164" y="680"/>
+  <object type="plasma" gid="38" x="950" y="901"/>
+  <object type="plasma" gid="38" x="1600" y="1119"/>
+ </objectgroup>
 </map>

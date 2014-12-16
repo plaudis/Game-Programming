@@ -21,7 +21,7 @@ GameObject::GameObject(int spriteSheet, float posX, float posY, float wi, float 
 	h = hj;
 	hits = hit;
 	flipped = flip;
-	powerUp = 0;
+	bullets = 0;
 	collidedBottom = false;
 	collidedTop = false;
 	collidedRight = false;

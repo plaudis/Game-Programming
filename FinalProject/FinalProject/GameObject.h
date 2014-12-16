@@ -33,7 +33,7 @@ public:
 	float friction_x;
 	float friction_y;
 	int hits;
-	int powerUp;
+	int bullets;
 
 	bool flipped;
 	bool collidedTop;
