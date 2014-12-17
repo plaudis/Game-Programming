@@ -84,6 +84,10 @@ Alienated::~Alienated()
 	Mix_FreeChunk(laser);
 	Mix_FreeChunk(plasmaReload);
 	Mix_FreeMusic(music);
+	Mix_FreeChunk(land);
+	Mix_FreeChunk(die);
+	Mix_FreeChunk(menu);
+	Mix_FreeChunk(select);
 	SDL_Quit();
 }
 
@@ -101,6 +105,7 @@ void Alienated::Init()
 	glMatrixMode(GL_MODELVIEW);
 	title = LoadTexture("title.png");
 	background = LoadTexture("space.png");
+	//background = LoadTexture("outer_space.png");
 	fontTexture = LoadTexture("font.png");
 	spriteSheet = LoadTexture("tiles_spritesheet.png");
 	laserSheet = LoadTexture("lasers.png");
@@ -111,6 +116,10 @@ void Alienated::Init()
 	winSound = Mix_LoadWAV("triumph.wav");
 	laser = Mix_LoadWAV("laser.wav");
 	plasmaReload = Mix_LoadWAV("plasma.wav");
+	land = Mix_LoadWAV("land.wav");
+	die = Mix_LoadWAV("death.wav"); 
+	menu = Mix_LoadWAV("menu.wav");
+	select = Mix_LoadWAV("select.wav");
 	music = Mix_LoadMUS("music.mp3");
 	Mix_PlayMusic(music, -1);
 	GLuint playerSpriteSheet = LoadTexture("p1_spritesheet.png");
@@ -446,7 +455,7 @@ void Alienated::collideWithMapY(GameObject * obj){
 			obj->collidedBottom = true;
 			//obj->y -= obj->velocity_y * FIXED_TIMESTEP;
 			obj->y -= fmod((obj->y - obj->height*OBJECT_SIZE), TILE_SIZE);
-			if (obj->velocity_y < -0.5f&&obj->collidedBottom){ shakeValue = 0.02f; }//shake screen
+			if (obj->velocity_y < -0.5f&&obj->collidedBottom){ shakeValue = 0.02f; Mix_PlayChannel(-1, land, 0); }//shake screen
 			obj->velocity_y = 0.0f; obj->acceleration_y = 0.0f;
 		}
 		//else obj->collidedBottom = false;
@@ -633,6 +642,7 @@ void Alienated::FixedUpdate(){
 			if (enemies[j]->collidesWithX(player)){//player died
 				alive = false;
 				state = 5;
+				Mix_PlayChannel(-1, die, 0);
 			}
 
 			enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
@@ -838,10 +848,14 @@ void Alienated::Update(float elapsed)
 		case STATE_PVP:
 		{
 			if (rival->hits >= MAX_HITS){
-				state = 5; playerScore++; return;
+				state = 5; playerScore++; 
+				Mix_PlayChannel(-1, die, 0);
+				return;
 			}
 			else if (player->hits >= MAX_HITS){
-				state = 5; rivalScore++; return;
+				state = 5; rivalScore++; 
+				Mix_PlayChannel(-1, die, 0);
+				return;
 			}
 			walk2AnimationTime += elapsed;
 			animateRival();
@@ -1085,6 +1099,7 @@ void Alienated::UpdateMenus(){
 			case STATE_MENU:
 			{
 				if (event.key.keysym.scancode == SDL_SCANCODE_SPACE || event.key.keysym.scancode == SDL_SCANCODE_RETURN) {
+					Mix_PlayChannel(-1, select, 0);
 					if (selection == 1)state = 2;
 					else if (selection == 2)state = 6;
 					else if (selection == 3)state = 7;
@@ -1093,10 +1108,12 @@ void Alienated::UpdateMenus(){
 
 				}
 				else if (event.key.keysym.scancode == SDL_SCANCODE_UP){
+					Mix_PlayChannel(-1, menu, 0);
 					if (selection == 0)selection = 4;
 					else selection -= 1;
 				}
 				else if (event.key.keysym.scancode == SDL_SCANCODE_DOWN){
+					Mix_PlayChannel(-1, menu, 0);
 					if (selection == 4)selection = 0;
 					else selection += 1;
 				}
@@ -1131,7 +1148,19 @@ void Alienated::UpdateMenus(){
 								state = 3;
 							}
 					}
-					else {ResetGame(); state = 2;}
+					else {
+						ResetGame(); 
+						state = 2;
+						//Switch locations
+						if ((playerScore+rivalScore)%2){
+							float x = player->x;
+							float y = player->y;
+							player->x = rival->x;
+							player->y = rival->y;
+							rival->x = x;
+							rival->y = y;
+						}
+					}
 				}
 			}
 				break;
@@ -1214,7 +1243,7 @@ void Alienated::RenderWin(){
 		glTranslatef(0.5f, -0.5f, 0.0);
 		PrintText(fontTexture, "Player:" + to_string(playerScore) + " Rival:" + to_string(rivalScore), 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 		glTranslatef(-0.4f, -0.5f, 0.0);
-		PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		PrintText(fontTexture, "SPACE to continue, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	else if (player->hits >= MAX_HITS){
 		glTranslatef(-1.5, 0.5f, 0.0);
@@ -1222,7 +1251,7 @@ void Alienated::RenderWin(){
 		glTranslatef(0.4f, -0.5f, 0.0);
 		PrintText(fontTexture, "Rival:" + to_string(rivalScore) + " Player:" + to_string(playerScore), 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 		glTranslatef(-0.4f, -0.5f, 0.0);
-		PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		PrintText(fontTexture, "SPACE to continue, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	else{
 		glTranslatef(-1.4f, 0.5f, 0.0);

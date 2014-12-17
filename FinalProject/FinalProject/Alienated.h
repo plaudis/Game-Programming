@@ -73,7 +73,7 @@ private:
 	unsigned char** levelData;
 
 	Mix_Music *music;
-	Mix_Chunk *jumpSound, *winSound, *laser, *plasmaReload;
+	Mix_Chunk *jumpSound, *winSound, *laser, *plasmaReload, *land, *die, *menu, *select;
 
 	SDL_Window* displayWindow;
 
