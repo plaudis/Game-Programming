@@ -21,9 +21,9 @@ public:
 
 private:
 	void Init();
-	void LoadMap();
-	void LoadTileMap();
-	void ResetGame();
+	void LoadTileMap(std::string file);
+	void ResetGame(); 
+	void ResetSingle(std::string level);
 	float timeUpdate();
 	void FixedUpdate();
 	void Update(float elapsed);
@@ -42,6 +42,7 @@ private:
 	void moveAround2P(GameObject* first, GameObject* second);
 	void animatePlayer();
 	void animateRival();
+	void animateEnemies();
 	void drawLives();
 
 	void renderTileMap();
@@ -58,6 +59,7 @@ private:
 	int state;
 	int selection;
 	int score;
+	int playerScore, rivalScore;
 	bool alive;
 	bool done;
 	float lastFrameTicks;
@@ -71,7 +73,7 @@ private:
 	unsigned char** levelData;
 
 	Mix_Music *music;
-	Mix_Chunk *jumpSound, *winSound;
+	Mix_Chunk *jumpSound, *winSound, *laser, *plasmaReload;
 
 	SDL_Window* displayWindow;
 
@@ -80,6 +82,8 @@ private:
 	GLuint fontTexture;
 	GLuint spriteSheet;
 	GLuint laserSheet;
+	GLuint enemySheet;
+	GLuint rivalHUD, playerHUD;
 	GameObject* player;
 	GameObject* rival;
 	std::vector<GameObject*> playerLasers;

@@ -29,8 +29,8 @@ GLuint LoadTexture(const char *image_path) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	}
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	SDL_FreeSurface(surface);
 
 	return textureID;
@@ -81,6 +81,8 @@ Alienated::~Alienated()
 	for (GLuint i = 0; i < deletedEnemies.size(); i++) { delete deletedEnemies[i]; }
 	Mix_FreeChunk(jumpSound);
 	Mix_FreeChunk(winSound);
+	Mix_FreeChunk(laser);
+	Mix_FreeChunk(plasmaReload);
 	Mix_FreeMusic(music);
 	SDL_Quit();
 }
@@ -98,23 +100,29 @@ void Alienated::Init()
 	//glOrtho(-1.33 * 10, 1.33 * 10, -1.0 * 10, 1.0 * 10, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
 	title = LoadTexture("title.png");
-	background = LoadTexture("outer_space.png");
+	background = LoadTexture("space.png");
 	fontTexture = LoadTexture("font.png");
 	spriteSheet = LoadTexture("tiles_spritesheet.png");
 	laserSheet = LoadTexture("lasers.png");
+	enemySheet = LoadTexture("enemies.png");
+	playerHUD = LoadTexture("hud_p1.png");
+	rivalHUD = LoadTexture("hud_p2.png");
 	jumpSound = Mix_LoadWAV("jumpSound.wav");
 	winSound = Mix_LoadWAV("triumph.wav");
+	laser = Mix_LoadWAV("laser.wav");
+	plasmaReload = Mix_LoadWAV("plasma.wav");
 	music = Mix_LoadMUS("music.mp3");
 	Mix_PlayMusic(music, -1);
 	GLuint playerSpriteSheet = LoadTexture("p1_spritesheet.png");
 	player = new GameObject(playerSpriteSheet, 0.0f, 0.0f, 0.66f, 0.92f, 0.0f, 0.0f, 0.0f, 0.0f / 508.0f, 196.0f / 288.0f, 66.0f / 508.0f, 92.0f / 288.0f, 0, true);
 	GLuint rivalSpriteSheet = LoadTexture("p2_spritesheet.png");
 	rival = new GameObject(rivalSpriteSheet, 0.0f, 0.0f, 0.66f, 0.92f, 0.0f, 0.0f, 0.0f, 0.0f / 494.0f, 190.0f / 282.0f, 66.0f / 494.0f, 92.0f / 282.0f, 0, false);
+	playerScore = 0;
+	rivalScore = 0;
 }
 
-void Alienated::LoadTileMap(){
-	//ifstream infile("level.txt");
-	ifstream infile("arena.txt");
+void Alienated::LoadTileMap(string file){
+	ifstream infile(file);
 	string line;
 	while (getline(infile, line)) {
 		if (line == "[header]") {
@@ -129,6 +137,9 @@ void Alienated::LoadTileMap(){
 			readEntityData(infile);
 		}
 		else if (line == "[Plasma]") {
+			readEntityData(infile);
+		}
+		else if (line == "[Enemies]") {
 			readEntityData(infile);
 		}
 	}
@@ -215,13 +226,14 @@ bool Alienated::readEntityData(std::ifstream &stream) {
 			if (type == "player"){ player->x = placeX; player->y = placeY; }
 			else if (type == "player2"){ rival->x = placeX; rival->y = placeY; }
 			else if (type == "plasma"){ plasmaLocations.push_back(new GameObject(LoadTexture("plasma.png"), placeX, placeY, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f , 0.0f, 1.0f, 1.0f, 0, false)); }
-			//placeEntity(type, placeX, placeY);
-			//enemies.push_back(new GameObject(spriteSheet, placeX, placeY, 0.75f, 0.75f, 1.5f, 0.0f, 0.0f, //width,height,dx,dy,rot
-			//	(float)(80 % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X, //u
-			//	(float)((80) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y, //v
-			//	1.0f / (float)SPRITE_COUNT_X, //w
-			//	1.0f / (float)SPRITE_COUNT_Y, //h
-			//	1.0f, false));
+			else if (type == "enemy") {
+				enemies.push_back(new GameObject(enemySheet, placeX, placeY, 0.72f, 0.51f, -1.5f, 0.0f, 0.0f, //width,height,dx,dy,rot
+					79.0f/256, //u
+					0.0f/64, //v
+					72.0f/256, //w
+					51.0f/64, //h
+					1, false));
+			}	
 		}
 	}
 	return true;
@@ -229,18 +241,21 @@ bool Alienated::readEntityData(std::ifstream &stream) {
 
 void Alienated::ResetGame(){
 	state = 1;
-	selection = 1;
+	selection = 0;
 	score = 0;
 	alive = true;
 	done = false;
 	lastFrameTicks = 0.0f;
 	timeLeftOver = 0.0f;
 	timePassed = 0.0f;
-	srand(time(NULL));
+	srand(time(nullptr));
 	for (GLuint i = 0; i < plasmaLocations.size(); i++) { delete plasmaLocations[i]; }
 	plasmaLocations.clear();
-	LoadTileMap();
+	LoadTileMap("arena.txt");
 	plasmaLocations[rand() % plasmaLocations.size()]->flipped = true;
+	GLuint next = rand() % plasmaLocations.size();
+	while (plasmaLocations[next]->flipped)next = rand() % plasmaLocations.size();
+	plasmaLocations[next]->flipped = true;
 	walkAnimationTime = 0.0f;
 	player->hits = 0;
 	player->bullets = 3;
@@ -263,10 +278,19 @@ void Alienated::ResetGame(){
 	rival->collidedTop = false;
 	rival->collidedLeft = false;
 	rival->collidedRight = false;
-	for (GLuint i = 0; i < deletedEnemies.size(); i++) { enemies.push_back(deletedEnemies[i]); }
-	deletedEnemies.clear();
 	for (GLuint i = 0; i < playerLasers.size(); i++) { delete playerLasers[i]; }
 	playerLasers.clear();
+}
+
+void Alienated::ResetSingle(string level){
+	for (GLuint i = 0; i < enemies.size(); i++) { delete enemies[i]; }
+	enemies.clear();
+	for (GLuint i = 0; i < deletedEnemies.size(); i++) { delete deletedEnemies[i]; }
+	deletedEnemies.clear();
+	for (GLuint i = 0; i < plasmaLocations.size(); i++) { delete plasmaLocations[i]; }
+	plasmaLocations.clear();
+	LoadTileMap(level);
+	for (GLuint i = 0; i < enemies.size(); i++) { if (i % 2){ enemies[i]->flipped = !enemies[i]->flipped; enemies[i]->velocity_x = -enemies[i]->velocity_x; } }
 }
 
 float Alienated::timeUpdate(){
@@ -319,6 +343,13 @@ bool Alienated::UpdateAndRender()
 		}
 			break;
 		case STATE_PVP:	
+		{
+			Update(timeUpdate());
+			RenderBackground();
+			Render();
+		}
+			break;
+		case STATE_SINGLE_PLAYER:
 		{
 			Update(timeUpdate());
 			RenderBackground();
@@ -379,17 +410,26 @@ void Alienated::collideWithMapX(GameObject * obj){
 		{
 			obj->collidedLeft = true;
 			obj->x -= obj->velocity_x * FIXED_TIMESTEP;
-			obj->velocity_x = 0.0f;//stop object
+			if (obj != player && obj != rival){//bounce for enemies
+				obj->velocity_x = -obj->velocity_x; 
+				obj->flipped = !obj->flipped;
+			}
+			else obj->velocity_x = 0.0f;//stop for player
 			obj->acceleration_x = 0.0f;
 		}
 	}
 	else if (obj->velocity_x > 0){
-		if ((levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE*0.5f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)]) ||
-			(levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE*0.5f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)]))
+		if (((levelData[worldToTileY(obj->y - obj->height*OBJECT_SIZE*0.5f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)]) ||
+			(levelData[worldToTileY(obj->y + obj->height*OBJECT_SIZE*0.5f)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)])) &&
+			((int)levelData[worldToTileY(obj->y)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)] != 46 && (int)levelData[worldToTileY(obj->y)][worldToTileX(obj->x + obj->width*OBJECT_SIZE)] != 58))
 		{
 			obj->collidedRight = true;
 			obj->x -= obj->velocity_x * FIXED_TIMESTEP;
-			obj->velocity_x = 0.0f;//stop object
+			if (obj != player && obj != rival){//bounce for enemies
+				obj->velocity_x = -obj->velocity_x;
+				obj->flipped = !obj->flipped;
+			}
+			else obj->velocity_x = 0.0f;//stop for player
 			obj->acceleration_x = 0.0f;
 		}
 	}
@@ -514,105 +554,119 @@ void destroyLaser(GameObject* l){
 }
 
 void Alienated::FixedUpdate(){
-	if (worldToTileX(player->x) >= 120 && score == 0){ score = 1; Mix_PlayChannel(-1, winSound, 0); }//win
-
 	shakeValue = lerp(shakeValue, 0.0f, FIXED_TIMESTEP);//gradually shake less
 	if (shakeValue < 0.01f)shakeValue = 0.0f;//stop shaking after a while
+	switch (state){
+	case STATE_PVP:
+	{
+		moveAround(player);
+		moveAround(rival);
 
-	moveAround(player);
-	moveAround(rival);
+		//plasma
+		for (GLuint i = 0; i < plasmaLocations.size(); i++) {
+			if (plasmaLocations[i]->flipped){
+				if (plasmaLocations[i]->collidesWithY(player) || plasmaLocations[i]->collidesWithX(player)){
+					player->bullets += 3;
+					Mix_PlayChannel(-1, plasmaReload, 0);
+					plasmaLocations[i]->flipped = false;
+					GLuint next = rand() % plasmaLocations.size();
+					while (next == i || plasmaLocations[next]->flipped)next = rand() % plasmaLocations.size();
+					plasmaLocations[next]->flipped = true;
+				}
+				else if (plasmaLocations[i]->collidesWithY(rival) || plasmaLocations[i]->collidesWithX(rival)){
+					rival->bullets += 3;
+					Mix_PlayChannel(-1, plasmaReload, 0);
+					plasmaLocations[i]->flipped = false;
+					GLuint next = rand() % plasmaLocations.size();
+					while (next == i || plasmaLocations[next]->flipped)next = rand() % plasmaLocations.size();
+					plasmaLocations[next]->flipped = true;
+				}
+				else {
+					plasmaLocations[i]->rotation += 360.0f*FIXED_TIMESTEP;
+				}
 
-	//moveAround2P(player, rival);
+			}
 
-	//collide enemies
-	for (GLuint j = 0; j < enemies.size(); j++) {
-		enemies[j]->velocity_x += enemies[j]->acceleration_x * FIXED_TIMESTEP;
-		enemies[j]->x += enemies[j]->velocity_x * FIXED_TIMESTEP;
-
-		collideWithMapX(enemies[j]);
-
-		if (enemies[j]->collidesWithX(player)){
-			ResetGame();
-			break;
 		}
 
-		enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
-		enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
-		enemies[j]->y += enemies[j]->velocity_y * FIXED_TIMESTEP;
+		//collide lasers
+		for (GLuint k = 0; k < playerLasers.size(); k++) {
+			if (playerLasers[k]->rotation > 90.0f){
+				playerLasers[k]->rotation += 2000.0f*FIXED_TIMESTEP;
+			}
+			else{
+				playerLasers[k]->x += playerLasers[k]->velocity_x * FIXED_TIMESTEP;
+				playerLasers[k]->y += playerLasers[k]->velocity_y * FIXED_TIMESTEP;
+				if (playerLasers[k]->v == 96.0f / 128.0f && playerLasers[k]->collidesWithX(player)){
+					player->hits += 1;
+					destroyLaser(playerLasers[k]);
+				}
+				else if (playerLasers[k]->v == 111.0f / 128.0f && playerLasers[k]->collidesWithX(rival)){
+					rival->hits += 1;
+					destroyLaser(playerLasers[k]);
+				}
+				else if (levelData[worldToTileY(playerLasers[k]->y)][worldToTileX(playerLasers[k]->x)]){
+					destroyLaser(playerLasers[k]);
+				}
 
-		if (!enemies[j]->collidedBottom){ enemies[j]->acceleration_y = -2.0f; }//gravity
+			}
 
-		collideWithMapY(enemies[j]);
-
-		if (enemies[j]->collidesWithY(player)){
-			//particleSource = new particleEmitter(enemies[j]->x, enemies[j]->y);
-			deletedEnemies.push_back(enemies[j]);
-			enemies.erase(enemies.begin() + j);
-			break;
 		}
 	}
-
-	//plasma
-	for (GLuint i = 0; i < plasmaLocations.size(); i++) { 
-		if (plasmaLocations[i]->flipped){
-			if (plasmaLocations[i]->collidesWithY(player) || plasmaLocations[i]->collidesWithX(player)){
-				player->bullets += 3;
-				plasmaLocations[i]->flipped = false;
-				GLuint next = rand() % plasmaLocations.size();
-				while (next == i)next = rand() % plasmaLocations.size();
-				plasmaLocations[next]->flipped = true;
-			}
-			else if (plasmaLocations[i]->collidesWithY(rival) || plasmaLocations[i]->collidesWithX(rival)){
-				rival->bullets += 3;
-				plasmaLocations[i]->flipped = false;
-				GLuint next = rand() % plasmaLocations.size();
-				while (next == i)next = rand() % plasmaLocations.size();
-				plasmaLocations[next]->flipped = true;
-			}
-			else {
-				plasmaLocations[i]->rotation += 360.0f*FIXED_TIMESTEP;
-			}
-
+		break;
+	case STATE_SINGLE_PLAYER:
+	{
+		moveAround(player);
+		if ((int)levelData[worldToTileY(player->y)][worldToTileX(player->x + player->width*OBJECT_SIZE)] == 46 || (int)levelData[worldToTileY(player->y)][worldToTileX(player->x + player->width*OBJECT_SIZE)] == 58){
+			if (score == 1){ score = 2; Mix_PlayChannel(-1, winSound, 0); ResetSingle("level2.txt"); }//win level 1
+			else if (score == 2){ score = 3; Mix_PlayChannel(-1, winSound, 0); ResetSingle("level3.txt"); }//win level 2
+			else if (score == 3){ score = 4; Mix_PlayChannel(-1, winSound, 0); state = 5; }//win level 3
 		}
-	
+
+		//collide enemies
+		for (GLuint j = 0; j < enemies.size(); j++) {
+			enemies[j]->velocity_x += enemies[j]->acceleration_x * FIXED_TIMESTEP;
+			enemies[j]->x += enemies[j]->velocity_x * FIXED_TIMESTEP;
+
+			collideWithMapX(enemies[j]);
+
+			if (enemies[j]->collidesWithX(player)){//player died
+				alive = false;
+				state = 5;
+			}
+
+			enemies[j]->velocity_y = lerp(enemies[j]->velocity_y, 0.0f, FIXED_TIMESTEP * enemies[j]->friction_y);
+			enemies[j]->velocity_y += enemies[j]->acceleration_y * FIXED_TIMESTEP;
+			enemies[j]->y += enemies[j]->velocity_y * FIXED_TIMESTEP;
+
+			if (!enemies[j]->collidedBottom){ enemies[j]->acceleration_y = -2.0f; }//gravity
+
+			collideWithMapY(enemies[j]);
+
+			if (enemies[j]->collidesWithY(player)){//enemy destroyed
+				//particleSource = new particleEmitter(enemies[j]->x, enemies[j]->y);
+				enemies[j]->velocity_x = 0.0f;
+				enemies[j]->width = 0.69f;  enemies[j]->height = 0.51f;  enemies[j]->u = 153.0f / 256; enemies[j]->w = 0.0f / 64; enemies[j]->w = 69.0f / 256; enemies[j]->h = 51.0f / 64;
+				deletedEnemies.push_back(enemies[j]);
+				enemies.erase(enemies.begin() + j);
+				break;
+			}
+		}
 	}
-
-	//collide lasers
-	for (GLuint k = 0; k < playerLasers.size(); k++) {
-		if (playerLasers[k]->rotation > 90.0f){
-			playerLasers[k]->rotation += 2000.0f*FIXED_TIMESTEP;
-		}
-		else{
-			playerLasers[k]->x += playerLasers[k]->velocity_x * FIXED_TIMESTEP;
-			playerLasers[k]->y += playerLasers[k]->velocity_y * FIXED_TIMESTEP;
-			if (playerLasers[k]->v == 96.0f / 128.0f && playerLasers[k]->collidesWithX(player)){
-				player->hits += 1;
-				destroyLaser(playerLasers[k]);
-			}
-			else if (playerLasers[k]->v == 111.0f / 128.0f && playerLasers[k]->collidesWithX(rival)){
-				rival->hits += 1;
-				destroyLaser(playerLasers[k]);
-			}
-			else if (levelData[worldToTileY(playerLasers[k]->y)][worldToTileX(playerLasers[k]->x)]){
-				destroyLaser(playerLasers[k]);
-			}
-			
-		}
-		
+		break;
 	}
-
 }
 
 void Alienated::animatePlayer(){
 	bool walkAnimation = false;
 
 	if (keys[SDL_SCANCODE_LEFT]) {//move left
-		player->acceleration_x = -1.0f;
+		player->acceleration_x = -2.0f;
 		player->flipped = true;
 		walkAnimation = true;
 	}
 	else if (keys[SDL_SCANCODE_RIGHT]) {//move right
-		player->acceleration_x = 1.0f;
+		player->acceleration_x = 2.0f;
 		player->flipped = false;
 		walkAnimation = true;
 	}
@@ -672,12 +726,12 @@ void Alienated::animateRival(){
 	bool walk2Animation = false;
 
 	if (keys[SDL_SCANCODE_A]) {//move p2 left
-		rival->acceleration_x = -1.0f;
+		rival->acceleration_x = -2.0f;
 		rival->flipped = true;
 		walk2Animation = true;
 	}
 	else if (keys[SDL_SCANCODE_D]) {//move p2 right
-		rival->acceleration_x = 1.0f;
+		rival->acceleration_x = 2.0f;
 		rival->flipped = false;
 		walk2Animation = true;
 	}
@@ -733,12 +787,20 @@ void Alienated::animateRival(){
 	}
 }
 
+void Alienated::animateEnemies(){
+	float animationValue = fmod(timePassed, 0.2f);
+	for (GLuint j = 0; j < enemies.size(); j++) {
+		if (animationValue >= 0.0f && animationValue < 0.1f){ enemies[j]->width = 0.72f;  enemies[j]->height = 0.51f;  enemies[j]->u = 79.0f / 256; enemies[j]->w = 0.0f / 64; enemies[j]->w = 72.0f / 256; enemies[j]->h = 51.0f / 64; }
+		else if (animationValue >= 0.1f && animationValue < 0.2f){ enemies[j]->width = 0.77f;  enemies[j]->height = 0.53f;  enemies[j]->u = 0.0f / 256; enemies[j]->w = 0.0f / 64; enemies[j]->w = 77.0f / 256; enemies[j]->h = 53.0f / 64; }
+	}
+}
+
 void Alienated::drawLives(){
 	glEnable(GL_TEXTURE_2D);
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	glBindTexture(GL_TEXTURE_2D, LoadTexture("hud_p2.png"));
+	glBindTexture(GL_TEXTURE_2D, rivalHUD);
 	GLfloat quad[] = { -0.08f, 0.08f, -0.08f, -0.08f, 0.08f, -0.08f, 0.08f, 0.08f };
 	glVertexPointer(2, GL_FLOAT, 0, quad);
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -752,7 +814,7 @@ void Alienated::drawLives(){
 		glDrawArrays(GL_QUADS, 0, 4);
 		glTranslatef(0.22f, 0.0f, 0.0);
 	}
-	glBindTexture(GL_TEXTURE_2D, LoadTexture("hud_p1.png"));
+	glBindTexture(GL_TEXTURE_2D, playerHUD);
 	glLoadIdentity();
 	glTranslatef(2.5f, 1.9f, 0.0);
 	for (GLuint i = player->hits; i < MAX_HITS; i++){//display lives
@@ -768,50 +830,65 @@ void Alienated::Update(float elapsed)
 {
 	timePassed += elapsed;
 	if (timePassed > 100000000000000000000.0f)timePassed -= 100000000000000000.0f;
-
-	if (player->hits >= MAX_HITS || rival->hits >= MAX_HITS){ state = 5; return; }
-
-
+	
 	walkAnimationTime += elapsed;
 	animatePlayer();
 
-	walk2AnimationTime += elapsed;
-	animateRival();
+	switch (state){
+		case STATE_PVP:
+		{
+			if (rival->hits >= MAX_HITS){
+				state = 5; playerScore++; return;
+			}
+			else if (player->hits >= MAX_HITS){
+				state = 5; rivalScore++; return;
+			}
+			walk2AnimationTime += elapsed;
+			animateRival();
+
+			//animate and remove lasers
+			for (GLuint k = 0; k < playerLasers.size(); k++) {
+				if (playerLasers[k]->rotation > 90.0f){
+					if (playerLasers[k]->rotation > 360.0f){
+						delete playerLasers[k];
+						playerLasers.erase(playerLasers.begin() + k);
+						break;
+					}
+					else if (playerLasers[k]->rotation > 270.0f){
+						if (playerLasers[k]->u == 0.0f){
+							playerLasers[k]->v = 0.0f / 128.0f;
+						}
+						else{
+							playerLasers[k]->v = 48.0f / 128.0f;
+						}
+						playerLasers[k]->w = 48.0f / 128.0f;
+						playerLasers[k]->h = 46.0f / 128.0f;
+					}
+				}
+			}
+		}
+			break;
+		case STATE_SINGLE_PLAYER:
+		{	
+			animateEnemies();
+		}
+			break;
+	}
 
 	//if (keys[SDL_SCANCODE_UP] && player->collidedBottom){//jump
 	//	player->velocity_y = 3.0f;
 	//	player->collidedBottom = false;
 	//	Mix_PlayChannel(-1, jumpSound, 0);
 	//}
-	if (keys[SDL_SCANCODE_DOWN] /*&& player->collidedBottom*/){//duck
-		player->u = 365.0f / 508.0f;
-		player->v = 98.0f / 288.0f;
-		player->w = 69.0f / 508.0f;
-		player->h = 71.0f / 288.0f;
-		player->width = 0.69f;
-		player->height = 0.71f;
-	}
+	//if (keys[SDL_SCANCODE_DOWN] /*&& player->collidedBottom*/){//duck
+	//	player->u = 365.0f / 508.0f;
+	//	player->v = 98.0f / 288.0f;
+	//	player->w = 69.0f / 508.0f;
+	//	player->h = 71.0f / 288.0f;
+	//	player->width = 0.69f;
+	//	player->height = 0.71f;
+	//}
 
-	//animate and remove lasers
-	for (GLuint k = 0; k < playerLasers.size(); k++) {
-		if (playerLasers[k]->rotation > 90.0f){
-			if (playerLasers[k]->rotation > 360.0f){
-				delete playerLasers[k];
-				playerLasers.erase(playerLasers.begin() + k);
-				break;
-			}
-			else if (playerLasers[k]->rotation > 270.0f){
-				if (playerLasers[k]->u == 0.0f){
-					playerLasers[k]->v = 0.0f / 128.0f;
-				}
-				else{
-					playerLasers[k]->v = 48.0f / 128.0f;
-				}
-				playerLasers[k]->w = 48.0f / 128.0f;
-				playerLasers[k]->h = 46.0f / 128.0f;
-			}
-		}
-	}
 
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
@@ -819,43 +896,82 @@ void Alienated::Update(float elapsed)
 			done = true;
 		}
 		else if (event.type == SDL_KEYDOWN) {
+			if (event.key.keysym.scancode == SDL_SCANCODE_M){
+				if (Mix_PausedMusic() == 1)//music paused
+				{
+					Mix_ResumeMusic();
+				}
+				//music is playing
+				else
+				{
+					Mix_PauseMusic();
+				}
+			}
 			if (event.key.keysym.scancode == SDL_SCANCODE_P) {
 				state = 4;
 			}
-			if (event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
-				if (player->bullets){
-					player->bullets -= 1;
-					if (keys[SDL_SCANCODE_UP]){
-						playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.1f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-					}
-					else{
-						playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-						if (player->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
-					}
-				}
-			}
-			else if (event.key.keysym.scancode == SDL_SCANCODE_UP && player->collidedBottom){
-				player->velocity_y = 3.0f;
-				player->collidedBottom = false;
-				Mix_PlayChannel(-1, jumpSound, 0);
-			}
-			if (event.key.keysym.scancode == SDL_SCANCODE_LCTRL) {
-				if (rival->bullets){
-					rival->bullets -= 1;
-					if (keys[SDL_SCANCODE_W]){
-						playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-					}
-					else{
-						playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
-						if (rival->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+
+			switch (state){
+			case STATE_PVP:
+			{
+				if (event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+					if (player->bullets){
+						player->bullets -= 1;
+						Mix_PlayChannel(-1, laser, 0);
+						if (keys[SDL_SCANCODE_UP]){
+							playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.1f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+						}
+						else{
+							playerLasers.push_back(new GameObject(laserSheet, player->x, player->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 111.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+							if (player->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+						}
 					}
 				}
+				else if (event.key.keysym.scancode == SDL_SCANCODE_UP && player->collidedBottom){
+					player->velocity_y = 3.0f;
+					player->collidedBottom = false;
+					Mix_PlayChannel(-1, jumpSound, 0);
+				}
+				if (event.key.keysym.scancode == SDL_SCANCODE_LCTRL) {
+					if (rival->bullets){
+						rival->bullets -= 1;
+						Mix_PlayChannel(-1, laser, 0);
+						if (keys[SDL_SCANCODE_W]){
+							playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 0.0f, 5.0f, 90.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+						}
+						else{
+							playerLasers.push_back(new GameObject(laserSheet, rival->x, rival->y + 0.01f, 0.37f, 0.13f, 5.0f, 0.0f, 0.0f, 0.0f / 128.0f, 96.0f / 128.0f, 37.0f / 128.0f, 13.0f / 128.0f, 0, false));
+							if (rival->flipped)playerLasers[playerLasers.size() - 1]->velocity_x = -playerLasers[playerLasers.size() - 1]->velocity_x;
+						}
+					}
+				}
+				else if (event.key.keysym.scancode == SDL_SCANCODE_W && rival->collidedBottom){
+					rival->velocity_y = 3.0f;
+					rival->collidedBottom = false;
+					Mix_PlayChannel(-1, jumpSound, 0);
+				}
 			}
-			else if (event.key.keysym.scancode == SDL_SCANCODE_W && rival->collidedBottom){
-				rival->velocity_y = 3.0f;
-				rival->collidedBottom = false;
-				Mix_PlayChannel(-1, jumpSound, 0);
+				break;
+			case STATE_SINGLE_PLAYER:
+			{
+				if (event.key.keysym.scancode == SDL_SCANCODE_UP && player->collidedBottom){
+					player->velocity_y = 3.0f;
+					player->collidedBottom = false;
+					Mix_PlayChannel(-1, jumpSound, 0);
+				}
+				if (event.key.keysym.scancode == SDL_SCANCODE_1){
+					score = 1; ResetSingle("level1.txt");
+				}
+				else if (event.key.keysym.scancode == SDL_SCANCODE_2){
+					score = 2; ResetSingle("level2.txt");
+				}
+				else if (event.key.keysym.scancode == SDL_SCANCODE_3){
+					score = 3; ResetSingle("level3.txt");
+				}
 			}
+				break;
+			}
+			
 		}
 	}
 }
@@ -864,31 +980,44 @@ void Alienated::Render()
 {
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-		//if (player->y>-4.4 && player->x>2 * 1.33)
-		//	glTranslatef(-player->x, -player->y, 0.0f); //scrolling
-		//else{//boundary lock
-		//	float y = player->y;
-		//	float x = player->x;
-		//	if (y < -4.4f)y = -4.4f;
-		//	if (x < 2 * 1.00f)x = 2 * 1.00f;
-		//	glTranslatef(-x, -y, 0.0f);
-		//}
-	glTranslatef(-TILE_SIZE * mapWidth / 2, TILE_SIZE * mapHeight/ 2, 0.0f);
-	glTranslatef(0.0f, sin(timePassed * 50)*shakeValue, 0.0f);//shake screen
-	renderTileMap();
-	player->DrawSprite(OBJECT_SIZE);
-	rival->DrawSprite(OBJECT_SIZE);
-	drawLives();
-	for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
-	for (GLuint i = 0; i < playerLasers.size(); i++) { playerLasers[i]->DrawSprite(OBJECT_SIZE); }
-	for (GLuint i = 0; i < plasmaLocations.size(); i++) { if (plasmaLocations[i]->flipped)plasmaLocations[i]->DrawSprite(OBJECT_SIZE); }
-	glLoadIdentity();
-	glTranslatef(-2.4f, 1.7f, 0.0);
-	PrintText(fontTexture, to_string(rival->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
-	glLoadIdentity();
-	glTranslatef(2.2f, 1.7f, 0.0);
-	if (player->bullets <= 9)glTranslatef(0.2f, 0.0f, 0.0);
-	PrintText(fontTexture, to_string(player->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+	switch (state){
+	case STATE_PVP:
+	{
+		glTranslatef(-TILE_SIZE * mapWidth / 2, TILE_SIZE * mapHeight / 2, 0.0f);
+		glTranslatef(0.0f, sin(timePassed * 50)*shakeValue, 0.0f);//shake screen
+		renderTileMap();
+		player->DrawSprite(OBJECT_SIZE);
+		rival->DrawSprite(OBJECT_SIZE);
+		drawLives();
+		for (GLuint i = 0; i < playerLasers.size(); i++) { playerLasers[i]->DrawSprite(OBJECT_SIZE); }
+		for (GLuint i = 0; i < plasmaLocations.size(); i++) { if (plasmaLocations[i]->flipped)plasmaLocations[i]->DrawSprite(OBJECT_SIZE); }
+		glLoadIdentity();
+		glTranslatef(-2.4f, 1.7f, 0.0);
+		PrintText(fontTexture, to_string(rival->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+		glLoadIdentity();
+		glTranslatef(2.2f, 1.7f, 0.0);
+		if (player->bullets <= 9)glTranslatef(0.2f, 0.0f, 0.0);
+		PrintText(fontTexture, to_string(player->bullets), 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+	}
+		break;
+	case STATE_SINGLE_PLAYER:
+	{
+		if (player->x>2.66f&&player->x<10.1f&&score<3)glTranslatef(-player->x, TILE_SIZE * mapHeight / 2, 0.0f);
+		else if (player->x<2.66f)glTranslatef(-2.66f, TILE_SIZE * mapHeight / 2, 0.0f);
+		else if (score<3)glTranslatef(-10.1f, TILE_SIZE * mapHeight / 2, 0.0f);
+		else {
+			if (player->x > 14.47f)glTranslatef(-14.47f, TILE_SIZE * mapHeight / 2, 0.0f);
+			else glTranslatef(-player->x, TILE_SIZE * mapHeight / 2, 0.0f);
+		}
+		glTranslatef(0.0f, sin(timePassed * 50)*shakeValue, 0.0f);//shake screen
+		renderTileMap();
+		for (GLuint i = 0; i < deletedEnemies.size(); i++) { deletedEnemies[i]->DrawSprite(OBJECT_SIZE); }
+		player->DrawSprite(OBJECT_SIZE);
+		for (GLuint i = 0; i < enemies.size(); i++) { enemies[i]->DrawSprite(OBJECT_SIZE); }
+	}
+		break;
+	}
+	
 	glPopMatrix();
 	SDL_GL_SwapWindow(displayWindow);
 }
@@ -941,6 +1070,17 @@ void Alienated::UpdateMenus(){
 			done = true;
 		}
 		else if (event.type == SDL_KEYDOWN){
+			if (event.key.keysym.scancode == SDL_SCANCODE_M){
+				if (Mix_PausedMusic() == 1)//music paused
+				{
+					Mix_ResumeMusic();
+				}
+				//music is playing
+				else
+				{
+					Mix_PauseMusic();
+				}
+			}
 			switch (state) {
 			case STATE_MENU:
 			{
@@ -948,13 +1088,16 @@ void Alienated::UpdateMenus(){
 					if (selection == 1)state = 2;
 					else if (selection == 2)state = 6;
 					else if (selection == 3)state = 7;
+					else if (selection == 0){ state = 3; ResetSingle("level1.txt"); score = 1; }
+					else if (selection == 4)done = true;
+
 				}
 				else if (event.key.keysym.scancode == SDL_SCANCODE_UP){
-					if (selection == 1)selection = 3;
+					if (selection == 0)selection = 4;
 					else selection -= 1;
 				}
 				else if (event.key.keysym.scancode == SDL_SCANCODE_DOWN){
-					if (selection == 3)selection = 1;
+					if (selection == 4)selection = 0;
 					else selection += 1;
 				}
 				
@@ -962,19 +1105,44 @@ void Alienated::UpdateMenus(){
 				break;
 			case STATE_GAME_OVER:
 			{	
-				if (event.key.keysym.scancode == SDL_SCANCODE_SPACE || event.key.keysym.scancode == SDL_SCANCODE_RETURN) {
+				if (event.key.keysym.scancode == SDL_SCANCODE_RETURN) {
 					ResetGame();
+					playerScore = 0;
+					rivalScore = 0;
 				}
-				else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
-					ResetGame();
-					state = 2;
+				else if (event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+					if (score){ 
+							if (score==1){
+								ResetGame(); 
+								score = 1; 
+								ResetSingle("level1.txt");
+								state = 3; 
+							}
+							else if (score == 2){
+								ResetGame();
+								score = 2;
+								ResetSingle("level2.txt");
+								state = 3;
+							}
+							else if (score == 3){
+								ResetGame();
+								score = 3;
+								ResetSingle("level3.txt");
+								state = 3;
+							}
+					}
+					else {ResetGame(); state = 2;}
 				}
 			}
 				break;
 			case STATE_GAME_PAUSED:
 			{
 				if (event.key.keysym.scancode == SDL_SCANCODE_P || event.key.keysym.scancode == SDL_SCANCODE_SPACE || event.key.keysym.scancode == SDL_SCANCODE_RETURN) {
-					state = 2;
+					if (score)state = 3;
+					else state = 2;
+				}
+				if (event.key.keysym.scancode == SDL_SCANCODE_R) {
+					ResetGame();
 				}
 			}
 				break;
@@ -1018,14 +1186,20 @@ void Alienated::RenderMenu(){
 	glDisable(GL_TEXTURE_2D);
 	glLoadIdentity();
 	glTranslatef(-0.9f, 0.0f, 0.0);
+	if (selection == 0)PrintText(fontTexture, "Single Player", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+	else PrintText(fontTexture, "Single Player", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(0.0f, -0.3f, 0.0);
 	if(selection == 1)PrintText(fontTexture, "PVP Arena", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
-	else PrintText(fontTexture, "PVP Arena", 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	else PrintText(fontTexture, "PVP Arena", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.0f, -0.3f, 0.0);
 	if (selection == 2)PrintText(fontTexture, "Instructions", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
-	else PrintText(fontTexture, "Instructions", 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	else PrintText(fontTexture, "Instructions", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.0f, -0.3f, 0.0);
 	if (selection == 3)PrintText(fontTexture, "About", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
-	else PrintText(fontTexture, "About", 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	else PrintText(fontTexture, "About", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(0.0f, -0.3f, 0.0);
+	if (selection == 4)PrintText(fontTexture, "Quit", 0.2f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
+	else PrintText(fontTexture, "Quit", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
 }
@@ -1037,20 +1211,24 @@ void Alienated::RenderWin(){
 	if (rival->hits >= MAX_HITS){
 		glTranslatef(-1.7f, 0.5f, 0.0);
 		PrintText(fontTexture, "PLAYER WINS!", 0.3f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
-		glTranslatef(0.2f, -1.0f, 0.0);
-		PrintText(fontTexture, "R to restart, SPACE to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		glTranslatef(0.5f, -0.5f, 0.0);
+		PrintText(fontTexture, "Player:" + to_string(playerScore) + " Rival:" + to_string(rivalScore), 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		glTranslatef(-0.4f, -0.5f, 0.0);
+		PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	else if (player->hits >= MAX_HITS){
 		glTranslatef(-1.5, 0.5f, 0.0);
 		PrintText(fontTexture, "RIVAL WINS!", 0.3f, 0.0f, 0.0f, 0.0f, 0.7f, 1.0f);
-		glTranslatef(0.1f, -1.0f, 0.0);
-		PrintText(fontTexture, "R to restart, SPACE to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		glTranslatef(0.4f, -0.5f, 0.0);
+		PrintText(fontTexture, "Rival:" + to_string(rivalScore) + " Player:" + to_string(playerScore), 0.15f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		glTranslatef(-0.4f, -0.5f, 0.0);
+		PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	else{
-		glTranslatef(-0.85f, 0.5f, 0.0);
-		PrintText(fontTexture, "YOU WIN!", 0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f);
-		glTranslatef(0.35f, -1.0f, 0.0);
-		PrintText(fontTexture, "R to restart, SPACE to quit", 0.05f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		glTranslatef(-1.4f, 0.5f, 0.0);
+		PrintText(fontTexture, "YOU WIN!", 0.4f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f);
+		glTranslatef(-0.1f, -0.5f, 0.0);
+		PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
@@ -1060,10 +1238,10 @@ void Alienated::RenderLoss(){
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	glTranslatef(-0.5f, 0.5f, 0.0);
-	PrintText(fontTexture, "YOU LOSE!", 0.13f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f);
-	/*glTranslatef(0.05f, -1.0f, 0.0);
-	PrintText(fontTexture, "Click To Play Again", 0.05f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);*/
+	glTranslatef(-1.5f, 0.5f, 0.0);
+	PrintText(fontTexture, "YOU DIED!", 0.4f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+	glTranslatef(0.0f, -0.5f, 0.0);
+	PrintText(fontTexture, "SPACE to restart, ENTER to quit", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
 }
@@ -1074,6 +1252,8 @@ void Alienated::RenderPause(){
 	glLoadIdentity();
 	glTranslatef(-1.5f, 0.0f, 0.0);
 	PrintText(fontTexture, "GAME PAUSED", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	glTranslatef(0.2f, -0.5f, 0.0);
+	PrintText(fontTexture, "P to continue, R to return", 0.1f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
 }
@@ -1082,21 +1262,23 @@ void Alienated::RenderInstructions(){
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	glTranslatef(-1.72f, 1.5f, 0.0);
-	PrintText(fontTexture, "Instructions", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	glTranslatef(-1.72f, 1.7f, 0.0);
+	PrintText(fontTexture, "Instructions", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glLoadIdentity();
-	glTranslatef(-2.0f, 1.0f, 0.0);
+	glTranslatef(-2.0f, 1.2f, 0.0);
 	PrintText(fontTexture, "PLAYER:", 0.25f, 0.0f, 0.0f, 0.7f, 0.0f, 1.0f);
 	glTranslatef(0.5f, -0.5f, 0.0);
-	PrintText(fontTexture, "ARROWS to Move", 0.2f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "ARROWS to Move", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.0f, -0.5f, 0.0);
-	PrintText(fontTexture, "Right CTRL to Shoot", 0.2f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "Right CTRL to Shoot", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(-0.5f, -0.5f, 0.0);
 	PrintText(fontTexture, "RIVAL:", 0.25f, 0.0f, 0.0f, 0.0f, 0.7f, 1.0f);
 	glTranslatef(0.5f, -0.5f, 0.0);
-	PrintText(fontTexture, "W A S D to Move", 0.2f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "W, A, D to Move", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.0f, -0.5f, 0.0);
-	PrintText(fontTexture, "Left CTRL to Shoot", 0.2f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "Left CTRL to Shoot", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(-0.9f, -0.4f, 0.0);
+	PrintText(fontTexture, "P to Pause Game, M to pause music", 0.15f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
 }
@@ -1106,15 +1288,19 @@ void Alienated::RenderAbout(){
 	glPushMatrix();
 	glLoadIdentity();
 	glTranslatef(-1.1f, 1.5f, 0.0);
-	PrintText(fontTexture, "NYU-Poly", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "NYU-Poly", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.3f, -0.4f, 0.0);
-	PrintText(fontTexture, "CS3113", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "CS3113", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(-1.05f, -0.4f, 0.0);
-	PrintText(fontTexture, "Final Project", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-	glTranslatef(-0.3f, -1.2f, 0.0);
-	PrintText(fontTexture, "Roberts Plaudis", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "Final Project", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(-0.3f, -1.0f, 0.0);
+	PrintText(fontTexture, "Roberts Plaudis", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	glTranslatef(0.9f, -0.4f, 0.0);
-	PrintText(fontTexture, "N15592461", 0.3f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	PrintText(fontTexture, "N15592461", 0.3f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(-0.7f, -0.7f, 0.0);
+	PrintText(fontTexture, "Music: Dum Dee Dum", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
+	glTranslatef(0.7f, -0.4f, 0.0);
+	PrintText(fontTexture, "	by Keys n Krates", 0.2f, 0.0f, 0.75f, 0.75f, 1.0f, 1.0f);
 	SDL_GL_SwapWindow(displayWindow);
 	glPopMatrix();
 }
